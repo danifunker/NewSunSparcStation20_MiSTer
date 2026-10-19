@@ -190,10 +190,14 @@ module l1cache
   logic [63:0] r_wdata;
   logic [SET_W-1:0] r_set;
   logic [1:0]  fill_beat;
-  logic [63:0] fill_data;        // the demand doubleword
   logic        fill_err, fill_snooped;
   logic [WW-1:0] fill_way;
-  logic [31:0] fill_tag_start;   // the victim's tag word at the start of the fill (at its end: with the valid bit)
+  logic [31:24] fill_tag_hi;     // the victim's tag word at the start of the fill, above the tag (which is r_pa[35:12])
+  /* verilator lint_off UNUSEDSIGNAL */   // [23:0]: always 0
+  logic [31:0] r_vbit, q_vbit;   // vbit_of(r_pa), vbit_of(q_pa) (Quartus 17: no part-select of a call)
+  /* verilator lint_on UNUSEDSIGNAL */
+  logic [31:0] fill_tag_keep;
+  assign fill_tag_keep   = {fill_tag_hi, r_pa[35:12]};
   logic        st_hit_written;
   logic        single_lock;
 
@@ -340,6 +344,8 @@ module l1cache
   assign q_set = q_cur[6 -: SET_W];           // line[11:SET_LSB]: line bit k is q_cur[k-5]
   logic [35:0] q_pa;                          // the line as an address, for the valid bit
   assign q_pa = {q_cur[30:0], 5'b00000};
+  assign r_vbit = vbit_of(r_pa);
+  assign q_vbit = vbit_of(q_pa);
   logic [WAYS-1:0] q_match;
   logic            q_any;
   logic [WW-1:0]   q_idx;
@@ -351,7 +357,7 @@ module l1cache
     for (int i = WAYS - 1; i >= 0; i--) if (q_match[i]) q_idx = WW'(i);
   end
   logic [WW-1:0] q_way_q;
-  logic [31:0]   q_word_q;
+  logic [31:24]  q_word_hi;      // the matched tag word above the tag (its tag bits are q_cur[30:7], held until the write)
 
   // ---------------------------------------------------------------------
   // The flash sweeps (valid + MRU, or locks): two cycles a set
@@ -409,13 +415,15 @@ module l1cache
   logic fill_beat_now;             // a fill beat arrives this cycle
   assign fill_beat_now = st == S_FILL && ack && !mem_rsp_i.err;
   logic st_hit_now;                // a write hit updates the line this cycle
-  assign st_hit_now = st == S_WRITE_WAIT && hit && !st_hit_written && r_cacheable;
+  // (the I-cache has no stores: its st never reaches S_WRITE_WAIT or the
+  // atomic states, which Quartus cannot see through st's encoding)
+  assign st_hit_now = !ICACHE && st == S_WRITE_WAIT && hit && !st_hit_written && r_cacheable;
   logic fill_tag_go, fill_end_go, atomic_inval_go, snoop_rd_go, snoop_wr_go, flash_go, dg_tag_go, dg_data_go, mru_go;
   assign fill_tag_go     = st == S_FILL_START;
   // (a queued snoop compared in this very cycle read the tags before the fill's
   // validation: it cannot match, so it vetoes the validation instead)
   assign fill_end_go     = st == S_DONE && !fill_err && !fill_snooped && !(qs == Q_CMP && q_cur[30:0] == r_pa[35:5]);
-  assign atomic_inval_go = st == S_LOOKUP && r_atomic && hit;
+  assign atomic_inval_go = !ICACHE && st == S_LOOKUP && r_atomic && hit;
   // The invalidation's write, and the re-read after it lost the tag port to
   // a fill's start or end or an atomic's invalidation (that write may have
   // changed the set: the compare is done again). Dropping it, as this cache
@@ -436,7 +444,8 @@ module l1cache
 
   // data port B
   always_comb begin
-    db_we = 1'b0; db_addr = '0; db_be = 8'hFF; db_wdata = '0; db_we_way = '0;
+    // (db_wdata matters only with db_we: no zero default to mux in)
+    db_we = 1'b0; db_addr = '0; db_be = 8'hFF; db_wdata = diag_wdata_i; db_we_way = '0;
     if (fill_beat_now) begin
       db_we = 1'b1; db_addr = {r_pa[11:5], fill_beat}; db_wdata = mem_rsp_i.rdata; db_we_way[fill_way] = 1'b1;
     end else if (st_hit_now) begin
@@ -444,7 +453,7 @@ module l1cache
     end else if (fast_st && fhit) begin   // a fast store's hit line
       db_we = 1'b1; db_addr = pa_i[11:3]; db_be = be_i; db_wdata = wdata_i; db_we_way[fhit_idx] = 1'b1;
     end else if (dg_data_go) begin
-      db_addr = dg_daddr; db_wdata = diag_wdata_i;
+      db_addr = dg_daddr;
       if (diag_we_i && dg_way_ok) begin db_we = 1'b1; db_we_way[dg_way] = 1'b1; end
     end
   end
@@ -460,13 +469,14 @@ module l1cache
   always_comb begin
     tb_addr = '0; tb_we_way = '0; tb_wcom = dg_tag_word;
     if (fill_tag_go) begin
-      tb_addr = r_set; tb_we_way[fill_way] = 1'b1; tb_wcom = fill_tag_start;
+      tb_addr = r_set; tb_we_way[fill_way] = 1'b1; tb_wcom = fill_tag_keep;
     end else if (fill_end_go) begin
-      tb_addr = r_set; tb_we_way[fill_way] = 1'b1; tb_wcom = fill_tag_start | vbit_of(r_pa);
+      tb_addr = r_set; tb_we_way[fill_way] = 1'b1; tb_wcom = fill_tag_keep | vbit_of(r_pa);
     end else if (atomic_inval_go) begin
-      tb_addr = r_set; tb_we_way[hit_idx] = 1'b1; tb_wcom = ta_rdata[hit_idx] & ~vbit_of(r_pa);
+      // (a hit's tag bits are r_pa[35:12]: only the bits above them come from the RAM)
+      tb_addr = r_set; tb_we_way[hit_idx] = 1'b1; tb_wcom = {ta_rdata[hit_idx][31:24] & ~r_vbit[31:24], r_pa[35:12]};
     end else if (snoop_wr_go) begin
-      tb_addr = q_set; tb_we_way[q_way_q] = 1'b1; tb_wcom = q_word_q;
+      tb_addr = q_set; tb_we_way[q_way_q] = 1'b1; tb_wcom = {q_word_hi, q_cur[30:7]};
     end else if (q_retry_go) begin
       tb_addr = q_set;
     end else if (snoop_rd_go) begin
@@ -550,16 +560,27 @@ module l1cache
   logic [WW-1:0] fw_way;
   logic [7:0]  fw_be;
   logic [63:0] fw_d;
+  // D-cache: one way mux for both hits. rdata_o is read only with done_o,
+  // and of its terms done_q comes in S_IDLE with nothing else, hit_now in
+  // S_LOOKUP (the hit way, and the forward) and a fast hit in S_IDLE
+  // (fhit's way); stores ignore it. So the select is the state and done_q,
+  // both early, not hit_now/fast_ld, which hang off the tag compare and
+  // the micro-TLB: the load data path into the IU (m_rdata) is the
+  // chip's tightest. The I-cache keeps the two muxes: with five ways the
+  // shared one synthesised 136 ALUTs larger.
+  logic [WW-1:0] rd_idx;
   logic [63:0] hit_data;
+  assign rd_idx = (ICACHE || st != S_IDLE) ? hit_idx : fhit_idx;
   always_comb begin
-    hit_data = da_rdata[hit_idx];
-    if (fw_v && fw_idx == r_pa[11:3] && fw_way == hit_idx)
+    hit_data = da_rdata[rd_idx];
+    if ((ICACHE || st == S_LOOKUP) && fw_v && fw_idx == r_pa[11:3] && fw_way == hit_idx)
       for (int b = 0; b < 8; b++)
         if (fw_be[7 - b]) hit_data[8*(7-b) +: 8] = fw_d[8*(7-b) +: 8];
   end
   assign done_o  = done_q | hit_now | wr_now | fast;
   assign fast_o  = fast;
-  assign rdata_o = hit_now ? hit_data : fast_ld ? da_rdata[fhit_idx] : rdata_q;
+  assign rdata_o = ICACHE ? (hit_now ? hit_data : fast_ld ? da_rdata[fhit_idx] : rdata_q)
+                          : (done_q ? rdata_q : hit_data);
   assign err_o   = (hit_now || wr_now || fast) ? 1'b0 : err_q;
   // The request's fields are latched whenever one could be taken, whether
   // or not req_i is up (the CPU side's request valid comes late: it hangs
@@ -604,14 +625,14 @@ module l1cache
     if (rst) begin
       st <= S_IDLE;
       r_we <= 1'b0; r_atomic <= 1'b0; r_cacheable <= 1'b0; r_pa <= '0; r_be <= '0; r_wdata <= '0;
-      fill_beat <= '0; fill_data <= '0; fill_err <= 1'b0; fill_snooped <= 1'b0; fill_way <= '0;
-      fill_tag_start <= '0;
+      fill_beat <= '0; fill_err <= 1'b0; fill_snooped <= 1'b0; fill_way <= '0;
+      fill_tag_hi <= '0;
       st_hit_written <= 1'b0; single_lock <= 1'b0;
       rdata_q <= '0; err_q <= 1'b0;
       sq_wr <= '0; sq_rd <= '0; sq_count <= '0;
       wb_rd <= '0; wb_wr <= '0; wb_cnt <= '0;
       fw_v <= 1'b0; fw_idx <= '0; fw_way <= '0; fw_be <= '0; fw_d <= '0;
-      qs <= Q_IDLE; q_cur <= '0; q_way_q <= '0; q_word_q <= '0;
+      qs <= Q_IDLE; q_cur <= '0; q_way_q <= '0; q_word_hi <= '0;
       fs <= F_IDLE; f_kind_l <= 1'b0; f_set <= '0;
       ds <= D_IDLE; diag_rdata_o <= '0;
     end else begin
@@ -629,8 +650,7 @@ module l1cache
             fill_way <= victim;
             // the victim's tag word: the other half-line's valid bit kept when
             // the way already holds this tag (I-cache), else nothing valid
-            fill_tag_start <= {8'd0, r_pa[35:12]} |
-                              ((tag_present && tag_idx == victim) ? (ta_rdata[victim] & TAG_VMASK & ~vbit_of(r_pa)) : 32'd0);
+            fill_tag_hi <= (tag_present && tag_idx == victim) ? (ta_rdata[victim][31:24] & TAG_VMASK[31:24] & ~r_vbit[31:24]) : 8'd0;
             st <= S_FILL_START;
           end
         end
@@ -642,7 +662,8 @@ module l1cache
         S_FILL: begin
           if (ack) begin
             if (mem_rsp_i.err) fill_err <= 1'b1;
-            if (fill_beat == r_pa[4:3]) fill_data <= mem_rsp_i.rdata;
+            // the demand doubleword: rdata_q is read only with done_o
+            if (fill_beat == r_pa[4:3]) rdata_q <= mem_rsp_i.rdata;
             fill_beat <= fill_beat + 2'd1;
             if (fill_beat == 2'd3 || mem_rsp_i.err) st <= S_DONE;
           end
@@ -650,7 +671,6 @@ module l1cache
         S_DONE: begin
           // validate (the tag word with the valid bit, and the MRU word,
           // written now unless an error or a snoop said no) and answer
-          rdata_q <= fill_data;
           err_q <= fill_err;
           done_q <= 1'b1;
           st <= S_IDLE;
@@ -752,7 +772,7 @@ module l1cache
           // the tags of the set are on port B now
           if (q_any) begin
             q_way_q <= q_idx;
-            q_word_q <= tb_rdata[q_idx] & ~vbit_of(q_pa);
+            q_word_hi <= tb_rdata[q_idx][31:24] & ~q_vbit[31:24];
             qs <= Q_WRITE;
           end else if (!snoop_rd_go) begin
             qs <= Q_IDLE;                 // else the next entry is compared next cycle
