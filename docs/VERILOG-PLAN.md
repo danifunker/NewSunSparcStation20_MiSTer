@@ -457,3 +457,44 @@ TxD/RxD and the HPS UART; drive `UART_DTR/RTS` from WR5 and feed
 Reference material: [references/INDEX.md](references/INDEX.md) lists the
 datasheets, Sun specs and emulator/driver sources in `scratch/reference/`
 with their URLs; each RTL header names the sections it was written from.
+
+## 10. Work queue (from 2026-10-19)
+
+In this order (the user's, 2026-10-19). Each item: unit benches, the
+`sim/iu` regression and `perfbench` ticks for anything in the CPU, the
+2-CPU CPU suite in the simulation, a full build under
+`flock /tmp/quartus.lock`, then the board; commit before every build.
+
+**The board:** the MiSTerPi at 192.168.99.143 (in the gitignored
+`scripts/local.env` as `MISTER_HOST`; .92 is the HP cores' board). Take
+`/tmp/board.lock` on it (noclobber) while testing and remove it after.
+Screenshots and keys through `misterkvms-cli` (`$MISTERKVMS` in
+local.env), never MiSTer's own screenshot command. Its
+`games/SunSparcStation/boot0.rom` is the Sun PROM: Main sends boot0.rom
+then boot.rom as index 0, so a boot.rom (the test scripts' ROM) wins.
+
+1. **Board check of the CPU area pass** (146a1de, rbf 08a60f05: 36,250
+   ALMs, clk_sys +0.692 ns): cpu, netbsd, solaris, then the Sun PROM
+   tests and the CD. docs/sessions/notes-area-20261019.md.
+2. **Phase 13 step 1: the TCX's VRAM and scan-out on SDRAM** (§3 phase
+   13; the core requires the SDRAM module). The controller: the user's
+   hp9000-715 `rtl/mister/sdram64.sv` (GPL-2+, board-proven) or
+   Sorgelig's `sdram.sv` (GPL-3, allowed since 2026-10-18). A pin-level
+   SDRAM model in the simulation. Measure what the CPUs gain on DDR3.
+3. **D-cache: the issues the 2026-10-18 review found.** (a) S_WRITE_WAIT
+   re-checks for a hit every cycle against tags read at the current
+   `idx_i`: if the index moves while a store waits (after a watchdog
+   reset of the IU, for one) a store could update the wrong line; check
+   the hit once, in the accept cycle's tags, and prove it with a bench.
+   (b) The store-to-load forward (`fw_*`) can never fire, since the D-cache
+   takes no request outside S_IDLE: an assertion first, then remove it.
+   (l1cache has no unit bench yet: write one, tb_l1cache, for these.)
+4. **Instruction fetch** (profile-20261014.md: fetch was 12-28 % of
+   cycles under NetBSD): the I-cache miss latency, forward-branch
+   mispredicts, the bubble after a redirect. perfbench and the NetBSD
+   profile before and after.
+5. **An L2 cache** between ss20_mbus and ss20_memctl (~128 KB of the free
+   M10K, ~2k ALMs): fork/exec, file and shell tests.
+6. As room is needed: the area list left in notes-area-20261019.md (the
+   FPU's aligner/normaliser shifter shared, the cache valid bits in
+   their own byte lanes, IU f_npc and the delay-slot search, ...).
