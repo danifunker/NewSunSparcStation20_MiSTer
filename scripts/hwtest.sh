@@ -155,7 +155,8 @@ run_capture() {
     # boot.rom is the ROM under test: remove a Boot PROM record left by a
     # build before the OSD standard (FC0; Load ROM is F0, not remembered)
     rsh "rm -f /media/fat/config/$GAMES_DIR.f0"
-    rsh "echo 'load_core /media/fat/$MISTER_CORE_FOLDER/$REV.rbf' > /dev/MiSTer_cmd"
+    # through the OSD only (never /dev/MiSTer_cmd or mrext: the user's rule)
+    scripts/board/osd_load.sh "$REV" >&2"
     local t=0
     while kill -0 $cp 2>/dev/null; do
         if grep -a -q -E "$until" "$log" 2>/dev/null; then break; fi

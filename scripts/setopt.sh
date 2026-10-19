@@ -20,6 +20,10 @@
 #   video=tcx|cg3            O[10]   no CG3 in this core: always TCX
 #   l2tlb=on|off             O[17]   no L2 TLB in this core yet
 #   iommu=26|11|23|30        O[21:20] SS5 only
+# Not in the OSD, bring-up only:
+#   sdram_rd=0|1|2|3         [33:32] sdram64's read capture point (0: clk
+#                            edge 3; 1: clk_sdram 2.75; 2: falling 2.5;
+#                            3: edge 4, the simulation's)
 # The disks and the CD are always there (a disk while its image is
 # mounted). Retired: O[1] (two disks), O[4] (CD block size), O[5] (CD off),
 # O[11] (framebuffer output), O[15:14] (the old Scale), O[16] (cache),
@@ -49,6 +53,7 @@ F = {
     "iommu":    (20, 2, {"26": 0, "11": 1, "23": 2, "30": 3}),
     "memory":   (22, 2, {"464": 0, "256": 1, "128": 2, "64": 3}),
     "network":  (24, 3, {"eth0": 0, "none": 1, "off": 1, "eth1": 2, "macvlan": 3, "tap0": 4}),
+    "sdram_rd": (32, 2, {"0": 0, "1": 1, "2": 2, "3": 3}),
 }
 st = 0
 for a in sys.argv[1:]:

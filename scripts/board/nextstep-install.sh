@@ -179,7 +179,9 @@ for d in "1050,651" "0,-12" "0,24"; do       # Power Off, as Save above
 done
 [ "$ok" = 1 ] || fail "no shutdown (sim/out/osd-nsi-off.png)"
 sleep 10
-rsh "echo 'load_core /media/fat/menu.rbf' > /dev/MiSTer_cmd"; sleep 5
+# (the disk is read below while the core is stopped: load the menu core
+# through the OSD by hand; never /dev/MiSTer_cmd, the user's rule)
+echo "nextstep-install: load the Menu core through the OSD now, then press Enter" >&2; read -r _
 rsh "python3 /tmp/ufsread.py $G/$DISK ls /private/adm --offset 0x28000" | grep -q 'BuildDisk.custom' ||
     fail "no /private/adm/BuildDisk.custom on $DISK"
 n=$(rsh "python3 /tmp/ufsread.py $G/$DISK ls /NextLibrary/Receipts --offset 0x28000" | grep -c '\.pkg$')

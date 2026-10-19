@@ -18,7 +18,7 @@
 # the absolute path NUL-padded (Main menu.cpp FileSaveConfig). The core
 # remounts them at every start, so this writes the records and nothing else.
 #
-# --mgl REV (5|20) instead writes a one-shot MGL (for builds without the
+# --mgl REV (5|20) (disabled: launching goes through the OSD only) wrote a one-shot MGL (for builds without the
 # SC slots, or with --prom) and launches the core with it through
 # /dev/MiSTer_cmd. The rows an MGL names must be on the OSD's top page:
 # slots 0-2 and Load ROM are; slot 3 (NVRAM image, P5) is not.
@@ -43,6 +43,10 @@ if [ "$PROMSET" = 1 ] && [ -z "$MGL" ]; then
 fi
 abs() { case "$1" in ""|/*) echo "$1" ;; *) echo "$GAMES/$1" ;; esac; }
 if [ -n "$MGL" ]; then
+    # An MGL launch goes through /dev/MiSTer_cmd, which the user has ruled
+    # out (2026-10-19): cores load and ROMs are chosen through the OSD only
+    # (scripts/board/osd_load.sh; Load ROM by hand)
+    echo "mount.sh: --mgl is disabled: load the core and choose Load ROM through the OSD" >&2; exit 2
     X="<mistergamedescription>\n  <rbf>$MISTER_CORE_FOLDER/$MGL</rbf>\n"
     for n in "${!SLOT[@]}"; do
         [ -n "${SLOT[$n]}" ] && X="$X  <file delay=\"1\" type=\"s\" index=\"$n\" path=\"$(abs "${SLOT[$n]}")\"/>\n"

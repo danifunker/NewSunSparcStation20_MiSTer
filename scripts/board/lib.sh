@@ -30,7 +30,8 @@ rsh() { ssh "${SSH_OPTS[@]}" "$DEV" "$@"; }
 # (KEEP_PROM=1 keeps it)
 core_start() {
     [ "${KEEP_PROM:-0}" = 1 ] || rsh "rm -f /media/fat/config/$GAMES_DIR.f0"
-    rsh "echo 'load_core /media/fat/$MISTER_CORE_FOLDER/${1:-SunSparcStation20}.rbf' > /dev/MiSTer_cmd"
+    # through the OSD only (never /dev/MiSTer_cmd or mrext: the user's rule)
+    scripts/board/osd_load.sh "${1:-SunSparcStation20}"
 }
 
 put_rom() { scp -q "${SSH_OPTS[@]}" "$1" "$DEV:$G/boot.rom"; }

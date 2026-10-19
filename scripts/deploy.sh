@@ -5,7 +5,9 @@
 # /media/fat/games/SunSparcStation/boot.rom, which the framework uploads at
 # every core start (ioctl index 0). The games folder is created if missing.
 # machine.sh first swaps in this revision's boot.rom and config files.
-# Launch: "load_core <rbf>" into /dev/MiSTer_cmd.
+# Launch: through the OSD (scripts/board/osd_load.sh: reloads the running
+# core's file, so the same name must be running already; never
+# /dev/MiSTer_cmd or mrext, the user's rule).
 set -u
 . "$(dirname "$0")/common.sh"
 : "${MISTER_HOST:?set MISTER_HOST in scripts/local.env}"
@@ -43,5 +45,5 @@ fi
 ssh "${SSH_OPTS[@]}" "$DEV" "test -f '$GAMES/boot.rom'" || log "warning: no $GAMES/boot.rom on the MiSTer"
 push "$RBF" "$CORES/$REV.rbf" || exit 1
 if [ "$LAUNCH" = 1 ]; then
-    ssh "${SSH_OPTS[@]}" "$DEV" "echo 'load_core $CORES/$REV.rbf' > /dev/MiSTer_cmd" && log "launched $REV"
+    scripts/board/osd_load.sh "$REV"
 fi
