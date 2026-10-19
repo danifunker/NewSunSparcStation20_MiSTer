@@ -66,10 +66,11 @@ module iu_muldiv (
   // ---------------------------------------------------------------------
   logic        drun;
   logic [5:0]  dcnt;
-  logic [31:0] num;          // the low word of |dividend|, shifted out MSB first
+  // nq: the low word of |dividend|, shifted out MSB first, while the
+  // quotient bits come in at the bottom: after 32 steps it is the quotient
+  logic [31:0] nq;
   logic [31:0] den;          // |divisor|
   logic [31:0] rem;          // the partial remainder (always < den)
-  logic [31:0] quo;
   logic        qneg;         // the quotient is negative
   logic        ovf_pre;      // |N| >> 32 >= |D|: the quotient needs more than 32 bits
   logic        dsigned;
@@ -92,7 +93,7 @@ module iu_muldiv (
     if (rst) begin
       drun <= 1'b0;
       dcnt <= '0;
-      num <= '0; den <= '0; rem <= '0; quo <= '0;
+      nq <= '0; den <= '0; rem <= '0;
       qneg <= 1'b0; ovf_pre <= 1'b0; dsigned <= 1'b0;
     end else if (kill_i) begin
       drun <= 1'b0;
@@ -102,10 +103,9 @@ module iu_muldiv (
       end else begin
         drun    <= 1'b1;
         dcnt    <= 6'd32;
-        num     <= n_abs[31:0];
+        nq      <= n_abs[31:0];
         den     <= d_abs;
         rem     <= n_abs[63:32];
-        quo     <= '0;
         qneg    <= n_neg ^ d_neg;
         ovf_pre <= n_abs[63:32] >= d_abs;
         dsigned <= signed_i;
@@ -115,16 +115,15 @@ module iu_muldiv (
         drun  <= 1'b0;
         ddone <= 1'b1;
       end else begin : step
+        // one subtractor: its borrow is the compare (trial < den)
         logic [32:0] trial;
-        trial = {rem, num[31]};
-        num   <= {num[30:0], 1'b0};
-        if (trial >= {1'b0, den}) begin
-          rem <= 32'(trial - {1'b0, den});
-          quo <= {quo[30:0], 1'b1};
-        end else begin
-          rem <= trial[31:0];
-          quo <= {quo[30:0], 1'b0};
-        end
+        /* verilator lint_off UNUSEDSIGNAL */   // diff[32]: 0 whenever it is used (trial >= den)
+        logic [33:0] diff;
+        /* verilator lint_on UNUSEDSIGNAL */
+        trial = {rem, nq[31]};
+        diff  = {1'b0, trial} - {2'b00, den};
+        rem   <= diff[33] ? trial[31:0] : diff[31:0];
+        nq    <= {nq[30:0], ~diff[33]};
         dcnt <= dcnt - 6'd1;
       end
     end
@@ -136,13 +135,13 @@ module iu_muldiv (
   always_comb begin
     if (!dsigned) begin
       dovf = ovf_pre;
-      dres = ovf_pre ? 32'hFFFF_FFFF : quo;
+      dres = ovf_pre ? 32'hFFFF_FFFF : nq;
     end else if (qneg) begin
-      dovf = ovf_pre || quo > 32'h8000_0000;
-      dres = dovf ? 32'h8000_0000 : -quo;
+      dovf = ovf_pre || nq > 32'h8000_0000;
+      dres = dovf ? 32'h8000_0000 : -nq;
     end else begin
-      dovf = ovf_pre || quo > 32'h7FFF_FFFF;
-      dres = dovf ? 32'h7FFF_FFFF : quo;
+      dovf = ovf_pre || nq > 32'h7FFF_FFFF;
+      dres = dovf ? 32'h7FFF_FFFF : nq;
     end
   end
 

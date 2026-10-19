@@ -119,7 +119,6 @@ module iu
   logic        d_trap;
   logic        d_annulled;     // the delay slot was annulled: a no-op
   logic        d_pred, e_pred; // BPRED: the fetch already went to this DCTI's target after its slot
-  logic [31:0] e_pc8;          // e_pc + 8, registered: where a mispredicted DCTI continues
   // E
   logic        e_valid;
   dec_t        e_dec;
@@ -565,7 +564,6 @@ module iu
       e_pc <= d_pc;
       e_npc <= (slot_in_d && redirect) ? redirect_target : d_npc;
       e_pred <= d_pred && !(slot_in_d && redirect);
-      e_pc8 <= d_pc + 32'd8;
       // the RF output is a cycle old: a write landing at this edge is taken here
       e_rs1 <= (rf_we && rf_rd == d_dec.rs1) ? rf_wdata : rf_q1;
       e_rs2 <= (rf_we && rf_rd == d_dec.rs2) ? rf_wdata : rf_q2;
@@ -734,11 +732,13 @@ module iu
   logic [7:0]  e_tag_tt;
   logic        br_cond;
   logic [31:0] e_wrval;        // wr %y/%psr/%wim/%tbr: rs1 xor operand 2
-  logic [31:0] e_pc_disp;      // the branch or call target: one adder for both
+  logic [31:0] e_pc_disp;      // the branch or call target, or pc + 8: one adder for all
   assign br_cond = cond_true(e_dec.cond, icc_fwd);
   assign e_addr  = a + b;
   assign e_wrval = a ^ b;
-  assign e_pc_disp = e_pc + (e_dec.cls == C_CALL ? e_disp30 : e_disp22);
+  // A predicted DCTI's target is already being fetched; E only needs where
+  // it continues when the guess was wrong: pc + 8 (no register for it)
+  assign e_pc_disp = e_pc + (e_pred ? 32'd8 : (e_dec.cls == C_CALL ? e_disp30 : e_disp22));
 
   always_comb begin
     e_taken  = 1'b0;
@@ -857,7 +857,7 @@ module iu
   // (a predicted DCTI that is not taken, or annulled -- a NOP here --
   // continues after its slot)
   assign redirect        = e_ctl_now && (e_pred ? !e_taken : e_taken);
-  assign redirect_target = e_pred ? e_pc8 : e_target;
+  assign redirect_target = e_pred ? e_pc_disp : e_target;
   assign annul_slot      = e_ctl_now && e_annul;
 
   assign e_go    = e_valid && !m_stall && !md_wait;
@@ -940,8 +940,11 @@ module iu
   end
 
   // the D-cache's lookup index for next cycle: E's address when E moves
-  // on, else M's own (the cache's request path reads it in the accept cycle)
-  assign dmem_nidx_o = e_go ? e_result[11:3] : m_result[11:3];
+  // on, else M's own (the cache's request path reads it in the accept
+  // cycle). e_addr, not e_result: they are equal for every memory class,
+  // and for any other class M makes no request next cycle, so the index
+  // is not used; this keeps the result mux off the RAM address path.
+  assign dmem_nidx_o = e_go ? e_addr[11:3] : m_result[11:3];
 
   assign m_go    = m_valid && !w_stall && (!m_is_mem || m_acked || (FAST_ACK && m_done));
   assign m_stall = m_valid && !m_go;

@@ -76,7 +76,8 @@ module iu_alu
         default: ;
       endcase
     end
-    sum = sub ? op1 - op2 - 32'(cin) : op1 + op2 + 32'(cin);
+    // one carry chain: a - b - c = a + ~b + !c
+    sum = op1 + (op2 ^ {32{sub}}) + 32'(sub ^ cin);
   end
 
   // Flags of the adder (Appendix C)
@@ -110,11 +111,9 @@ module iu_alu
       c = 1'b0;
     end
     if (is_shift) begin
-      case (op3_i[1:0])
-        2'd1: r = a_i << b_i[4:0];
-        2'd2: r = a_i >> b_i[4:0];
-        default: r = $signed(a_i) >>> b_i[4:0];
-      endcase
+      // srl and sra share one right shifter: sra shifts in a_i[31]
+      if (op3_i[1:0] == 2'd1) r = a_i << b_i[4:0];
+      else                    r = 32'($signed({op3_i[0] & a_i[31], a_i}) >>> b_i[4:0]);
       v = 1'b0;
       c = 1'b0;
     end
@@ -124,7 +123,7 @@ module iu_alu
   assign tag_trap_o = is_tv & tag_v;
 
   always_comb begin
-    r_o   = tag_trap_o ? a_i : r;                   // trapped: nothing written anyway
+    r_o   = r;                                      // (a tag trap writes and forwards nothing)
     icc_o = {r[31], r == 32'd0, v, c};
     cc_o  = cc & ~tag_trap_o;
     y_o   = {a_i[0], y_i[31:1]};
