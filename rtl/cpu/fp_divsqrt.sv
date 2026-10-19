@@ -11,6 +11,10 @@
 // Divide: q = floor(a * 2^57 / b), a and b the 53-bit significands in
 // [2^52, 2^53): a/b in (1/2, 2), so q in (2^56, 2^58): 58 restoring
 // steps, the first (rem - b, no doubling) giving the top bit, a >= b.
+// The remainder is kept doubled (rem = 2r): every step is then
+// 2 rem - 2b, the first one too (rem loaded with a), so the first needs
+// no step of its own; the quotient bits are the same and rem != 0 still
+// says whether anything is left.
 // Square root: the radicand is a * 2^60 (or a * 2^61 for an odd exponent,
 // which makes the exponent even), at most 114 bits; its integer root is
 // formed over 58 iterations (two radicand bits each), q in [2^56, 2^57).
@@ -37,27 +41,26 @@ module fp_divsqrt
   logic [115:0] rad;        // the radicand still to consume (sqrt)
   logic [57:0]  q;
   logic         sign;
-  logic signed [13:0] exp;
+  logic signed [13:0] exp;  // the result's exponent (value = q * 2^(exp - 55))
+  // the divisor is kept in rad at the even square root's alignment
+  // (rad[112:60]): a divide does not use rad otherwise
   logic [52:0]  den;
+  assign den = rad[112:60];
 
   // One step of either recurrence, on one subtractor: sqrt, two radicand
-  // bits down minus (4q + 1); divide, 2 rem - b (rem - b in the first step,
-  // which gives the quotient's top bit, a >= b)
-  logic        first;
+  // bits down minus (4q + 1); divide, 2 rem - 2b (rem doubled, above)
   logic [61:0] t_x, trial;
   always_comb begin
-    if (is_sqrt)    t_x = {rem[59:0], rad[115:114]};
-    else if (first) t_x = rem;
-    else            t_x = {rem[60:0], 1'b0};
-    trial = t_x - (is_sqrt ? {2'b00, q, 2'b01} : {9'd0, den});
+    if (is_sqrt) t_x = {rem[59:0], rad[115:114]};
+    else         t_x = {rem[60:0], 1'b0};
+    trial = t_x - (is_sqrt ? {2'b00, q, 2'b01} : {8'd0, den, 1'b0});
   end
 
   always_ff @(posedge clk) begin
     done_o <= 1'b0;
-    if (rst) begin
+    if (rst) begin                      // (the datapath needs no reset: start_i loads it)
       run <= 1'b0;
       cnt <= '0;
-      rem <= '0; rad <= '0; q <= '0; den <= '0; sign <= 1'b0; exp <= '0; is_sqrt <= 1'b0; first <= 1'b0;
     end else if (start_i) begin
       run <= 1'b1;
       is_sqrt <= sqrt_i;
@@ -67,22 +70,22 @@ module fp_divsqrt
         rem <= '0;
         sign <= 1'b0;
         // the square root's operand is rs2 (b)
+        // value = q * 2^(exp' - 56) = q * 2^((exp' - 1) - 55)
         if (b_i.exp[0]) begin
           rad <= 116'(b_i.man) << 61;
-          exp <= (b_i.exp - 14'sd1) >>> 1;
+          exp <= ((b_i.exp - 14'sd1) >>> 1) - 14'sd1;
         end else begin
           rad <= 116'(b_i.man) << 60;
-          exp <= b_i.exp >>> 1;
+          exp <= (b_i.exp >>> 1) - 14'sd1;
         end
       end else begin
         cnt <= 6'd58;
         sign <= a_i.sign ^ b_i.sign;
-        den <= b_i.man;
+        rad <= 116'(b_i.man) << 60;    // den
         rem <= 62'(a_i.man);
         q <= '0;
-        first <= 1'b1;
-        rad <= '0;
-        exp <= a_i.exp - b_i.exp;
+        // value = q * 2^(ea - eb - 57) = q * 2^((ea - eb - 2) - 55)
+        exp <= a_i.exp - b_i.exp - 14'sd2;
       end
     end else if (run) begin
       if (cnt == 6'd0) begin
@@ -90,7 +93,6 @@ module fp_divsqrt
         done_o <= 1'b1;
       end else begin
         cnt <= cnt - 6'd1;
-        first <= 1'b0;
         if (is_sqrt) rad <= rad << 2;
         if (!trial[61]) begin rem <= trial; q <= {q[56:0], 1'b1}; end
         else            begin rem <= t_x;   q <= {q[56:0], 1'b0}; end
@@ -105,9 +107,7 @@ module fp_divsqrt
     r_o.sign = sign;
     r_o.man = q;
     r_o.sticky = rem != '0;
-    // divide: value = q * 2^(ea - eb - 57) = q * 2^((exp - 2) - 55)
-    // sqrt:   value = q * 2^(exp' - 56)    = q * 2^((exp' - 1) - 55)
-    r_o.exp = is_sqrt ? (exp - 14'sd1) : (exp - 14'sd2);
+    r_o.exp = exp;
   end
 
   logic unused_ok;

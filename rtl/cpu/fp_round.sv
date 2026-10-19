@@ -137,10 +137,10 @@ module fp_round
     round_up = round_up_f(rd_i, sign, dbl_i ? kept[0] : kept[29], guard, sticky);
     {carry, kept_r} = {1'b0, kept} + (round_up ? (dbl_i ? 54'd1 : (54'd1 << 29)) : 54'd0);
     e_r = tiny ? emin : en;
-    if (carry) begin
-      kept_r = {1'b1, kept_r[52:1]};    // the significand became 2.0: renormalise
-      e_r = e_r + 14'sd1;
-    end
+    // The significand became 2.0: one more in the exponent. Its kept bits
+    // are all zero either way, so they need no renormalising shift (the
+    // implicit bit, kept_r[52], is read as carry | kept_r[52] below).
+    if (carry) e_r = e_r + 14'sd1;
     of = !is_zero && !tiny && (e_r > emax);
   end
 
@@ -154,7 +154,7 @@ module fp_round
     bits_o = '0;
     ebits = '0;
     fbits = '0;
-    subnormal_out = tiny && !kept_r[52];   // rounding may have made it the smallest normal
+    subnormal_out = tiny && !(kept_r[52] | carry);   // rounding may have made it the smallest normal
     if (is_zero) begin
       bits_o = {sign, 63'd0};
       flags_o[FX_NX] = sticky_in;

@@ -252,8 +252,17 @@ module fpu
 
   // Multiply: 53x53, registered (c_a and c_b hold for the whole operation:
   // the product is settled one cycle after S_START, well before it is used)
-  logic [105:0] mul_p1;
-  always_ff @(posedge clk) mul_p1 <= c_a.man * c_b.man;
+  // the product's top 58 bits and whether the low 48 are non-zero (they
+  // only feed the sticky bit: one register, not 48; the low bits settle
+  // first)
+  logic [105:0] mul_p;
+  logic [105:48] mul_p1;
+  logic         mul_p1_lo;
+  assign mul_p = c_a.man * c_b.man;
+  always_ff @(posedge clk) begin
+    mul_p1    <= mul_p[105:48];
+    mul_p1_lo <= |mul_p[47:0];
+  end
 
   // Add/sub: align to the larger exponent, 58-bit significands with the
   // leading one at 55 (three guard bits below), a sticky for what falls
@@ -270,7 +279,8 @@ module fpu
   // (below, with the result in m_small_al[34:3]).
   logic        al_b;                   // shift b
   always_comb begin
-    sub_eff1 = (c_op == O_SUB) ^ c_a.sign ^ c_b.sign;
+    // (a compare subtracts too: with equal signs a == b is then sum == 0)
+    sub_eff1 = (c_op == O_SUB || c_op == O_CMP || c_op == O_CMPE) ^ c_a.sign ^ c_b.sign;
     a_bigger1 = (c_a.exp > c_b.exp) || (c_a.exp == c_b.exp && c_a.man >= c_b.man);
     al_b = a_bigger1 || c_op == O_FTOI;
     ma = {2'b0, c_a.man, 3'b0};
@@ -285,8 +295,14 @@ module fpu
       m_small_al1 = '0;
       al_sticky1 = m_small != '0;
     end else begin
-      m_small_al1 = m_small >> ediff[5:0];
-      for (int i = 0; i < 58; i++) if (i < int'(ediff[5:0]) && m_small[i]) al_sticky1 = 1'b1;
+      // a shifter in six stages, each ORing what it drops into the sticky:
+      // the OR of m_small[ediff-1:0] without a 58-way compare
+      m_small_al1 = m_small;
+      for (int k = 0; k < 6; k++)
+        if (ediff[k]) begin
+          al_sticky1  = al_sticky1 | (|(m_small_al1 & ((58'd1 << (1 << k)) - 58'd1)));
+          m_small_al1 = m_small_al1 >> (1 << k);
+        end
     end
   end
 
@@ -304,15 +320,6 @@ module fpu
   // NaN handling (V8 App. N): a signalling NaN wins, else rs2's; quieted
   function automatic logic [63:0] quiet(input logic [63:0] bits, input logic dbl);
     return dbl ? (bits | 64'h0008_0000_0000_0000) : (bits | 64'h0040_0000_0000_0000);
-  endfunction
-  function automatic logic [63:0] default_nan(input logic dbl);
-    return dbl ? 64'h7FFF_FFFF_FFFF_FFFF : 64'h7FFF_FFFF_0000_0000;
-  endfunction
-  function automatic logic [63:0] inf_of(input logic s, input logic dbl);
-    return dbl ? {s, 11'h7FF, 52'd0} : {s, 8'hFF, 23'd0, 32'd0};
-  endfunction
-  function automatic logic [63:0] zero_of(input logic s);
-    return {s, 63'd0};
   endfunction
   // widen or narrow a NaN pattern between the precisions (the fraction's top bits are kept)
   function automatic logic [63:0] conv_nan(input logic [63:0] bits, input logic sd, input logic dd);
@@ -344,69 +351,126 @@ module fpu
     ftoi_inexact = al_sticky | (|m_small_al[2:0]);
   end
 
-  // The direct results and the wide operand for the rounder, per op
+  // The rounder's operand, by the op alone: with a direct result (NaN, inf,
+  // zero operands) the rounder's answer is not used (f_bits/f_flags take
+  // res_*_q and S_ROUND does not wait for rnd_busy), so those cases need not
+  // be in this mux.
   always_comb begin
     wide = '0;
-    res_bits = '0;
+    case (c_op)
+      O_ADD, O_SUB: begin
+        // an exact cancellation (sum == 0): +0, -0 in round-to-minus
+        wide.exp    = e_big;
+        wide.sign   = (sum == '0) ? (fsr_rd == RD_MINF) : (a_bigger ? c_a.sign : (c_b.sign ^ (c_op == O_SUB)));
+        wide.man    = sum[58:1];
+        wide.sticky = sum[0];
+      end
+      O_MUL: begin
+        // p = man_a * man_b in [2^104, 2^106): value = p * 2^(ea + eb - 104);
+        // the top 58 bits, the rest sticky: man * 2^(ea + eb - 56) = man * 2^(exp - 55)
+        wide.sign   = c_a.sign ^ c_b.sign;
+        wide.man    = mul_p1[105:48];
+        wide.sticky = mul_p1_lo;
+        wide.exp    = c_a.exp + c_b.exp - 14'sd1;
+      end
+      O_DIV, O_SQRT: wide = ds_r;
+      O_ITOF: begin
+        // the 32-bit integer in b_bits[63:32]: value = |i| * 2^(55 - 55)
+        wide.sign   = c_b_bits[63];
+        wide.man    = 58'(itof_abs);
+        wide.exp    = 14'sd55;
+        wide.sticky = 1'b0;
+      end
+      O_FTOF: begin
+        wide.sign   = c_b.sign;
+        wide.man    = {2'b0, c_b.man, 3'b0};    // leading one at 55: value = man * 2^(exp - 55)
+        wide.exp    = c_b.exp;
+        wide.sticky = 1'b0;
+      end
+      default: ;
+    endcase
+  end
+
+  // The direct results, per op, as a small datapath: an operand (a, b or
+  // the NaN rule's choice; a NaN converted to the result precision and
+  // quieted; its sign kept, flipped or cleared), a constant in the result
+  // precision ({sign, exponent all ones or zero, fraction all ones or
+  // zero}: the default NaN, an infinity, a zero; FTOI's saturations are
+  // the single default NaN and -0), or FTOI's integer. Each op's rules
+  // below only choose; the result is formed once (a priority chain of ~30
+  // 64-bit inputs before).
+  typedef enum logic [1:0] {RK_CONST, RK_OPND, RK_INT} rkind_t;
+  typedef enum logic [1:0] {SEL_A, SEL_B, SEL_NAN2} rsel_t;
+  typedef enum logic [1:0] {SG_KEEP, SG_FLIP, SG_CLR} rsgn_t;
+  rkind_t r_kind;
+  rsel_t  r_sel;
+  rsgn_t  r_sgn;
+  logic   r_fix, r_cs, r_ce, r_cf;
+  logic [63:0] r_opnd;
+  always_comb begin
+    case (r_sel)
+      SEL_A:   r_opnd = c_a_bits;
+      SEL_B:   r_opnd = c_b_bits;
+      default: r_opnd = nan2;
+    endcase
+    // (ADD/SUB/DIV/SQRT have src == dst: conv_nan is the identity there)
+    if (r_fix) r_opnd = quiet(conv_nan(r_opnd, c_src_dbl, c_dst_dbl), c_dst_dbl);
+    case (r_sgn)
+      SG_FLIP: r_opnd[63] = ~r_opnd[63];
+      SG_CLR:  r_opnd[63] = 1'b0;
+      default: ;
+    endcase
+    case (r_kind)
+      RK_OPND: res_bits = r_opnd;
+      RK_INT:  res_bits = {c_b.sign ? (32'd0 - ftoi_iv) : ftoi_iv, 32'd0};
+      default: res_bits = c_dst_dbl ? {r_cs, {11{r_ce}}, {52{r_cf}}} : {r_cs, {8{r_ce}}, {23{r_cf}}, 32'd0};
+    endcase
+  end
+
+  // ... and the rules, per op
+  always_comb begin
+    r_kind = RK_CONST; r_sel = SEL_B; r_fix = 1'b0; r_sgn = SG_KEEP;
+    r_cs = 1'b0; r_ce = 1'b0; r_cf = 1'b0;        // (+0)
     res_flags = '0;
     res_direct = 1'b0;
     res_fcc = 2'd0;
     res_is_cmp = 1'b0;
     case (c_op)
-      O_MOV: begin res_direct = 1'b1; res_bits = c_b_bits; end
-      O_NEG: begin res_direct = 1'b1; res_bits = {~c_b_bits[63], c_b_bits[62:0]}; end
-      O_ABS: begin res_direct = 1'b1; res_bits = {1'b0, c_b_bits[62:0]}; end
+      O_MOV: begin res_direct = 1'b1; r_kind = RK_OPND; r_sel = SEL_B; end
+      O_NEG: begin res_direct = 1'b1; r_kind = RK_OPND; r_sel = SEL_B; r_sgn = SG_FLIP; end
+      O_ABS: begin res_direct = 1'b1; r_kind = RK_OPND; r_sel = SEL_B; r_sgn = SG_CLR; end
 
       O_ADD, O_SUB: begin
         if (c_a.nan || c_b.nan) begin
           res_direct = 1'b1;
           res_flags[FX_NV] = c_a.snan | c_b.snan;
-          res_bits = quiet(nan2, c_src_dbl);
+          r_kind = RK_OPND; r_sel = SEL_NAN2; r_fix = 1'b1;
         end else if (c_a.inf && c_b.inf) begin
           res_direct = 1'b1;
-          if (sub_eff) begin res_flags[FX_NV] = 1'b1; res_bits = default_nan(c_dst_dbl); end
-          else res_bits = inf_of(c_a.sign, c_dst_dbl);
-        end else if (c_a.inf) begin res_direct = 1'b1; res_bits = inf_of(c_a.sign, c_dst_dbl); end
-        else if (c_b.inf) begin res_direct = 1'b1; res_bits = inf_of(c_b.sign ^ (c_op == O_SUB), c_dst_dbl); end
+          if (sub_eff) begin res_flags[FX_NV] = 1'b1; r_ce = 1'b1; r_cf = 1'b1; end
+          else r_cs = c_a.sign; r_ce = 1'b1;
+        end else if (c_a.inf) begin res_direct = 1'b1; r_cs = c_a.sign; r_ce = 1'b1; end
+        else if (c_b.inf) begin res_direct = 1'b1; r_cs = c_b.sign ^ (c_op == O_SUB); r_ce = 1'b1; end
         else if (c_a.zero && c_b.zero) begin
           res_direct = 1'b1;
           // the sum of two zeros: the common sign, else +0 (-0 in round-to-minus)
-          if (sub_eff) res_bits = zero_of(fsr_rd == RD_MINF);
-          else         res_bits = zero_of(c_a.sign);
-        end else if (c_a.zero) begin res_direct = 1'b1; res_bits = {c_b_bits[63] ^ (c_op == O_SUB), c_b_bits[62:0]}; end
-        else if (c_b.zero) begin res_direct = 1'b1; res_bits = c_a_bits; end
-        else begin
-          wide.exp = e_big;
-          if (sum == '0) begin
-            wide.man = '0;                    // exact cancellation: +0 (-0 in round-to-minus)
-            wide.sign = fsr_rd == RD_MINF;
-            wide.sticky = 1'b0;
-          end else begin
-            wide.sign = a_bigger ? c_a.sign : (c_b.sign ^ (c_op == O_SUB));
-            wide.man = sum[58:1];
-            wide.sticky = sum[0];
-          end
-        end
+          if (sub_eff) r_cs = fsr_rd == RD_MINF;
+          else         r_cs = c_a.sign;
+        end else if (c_a.zero) begin res_direct = 1'b1; r_kind = RK_OPND; r_sel = SEL_B; r_sgn = (c_op == O_SUB) ? SG_FLIP : SG_KEEP; end
+        else if (c_b.zero) begin res_direct = 1'b1; r_kind = RK_OPND; r_sel = SEL_A; end
       end
 
       O_MUL: begin
         if (c_a.nan || c_b.nan) begin
           res_direct = 1'b1;
           res_flags[FX_NV] = c_a.snan | c_b.snan;
-          res_bits = quiet(conv_nan(nan2, c_src_dbl, c_dst_dbl), c_dst_dbl);
+          r_kind = RK_OPND; r_sel = SEL_NAN2; r_fix = 1'b1;
         end else if ((c_a.inf && c_b.zero) || (c_a.zero && c_b.inf)) begin
-          res_direct = 1'b1; res_flags[FX_NV] = 1'b1; res_bits = default_nan(c_dst_dbl);
+          res_direct = 1'b1; res_flags[FX_NV] = 1'b1; r_ce = 1'b1; r_cf = 1'b1;
         end else if (c_a.inf || c_b.inf) begin
-          res_direct = 1'b1; res_bits = inf_of(c_a.sign ^ c_b.sign, c_dst_dbl);
+          res_direct = 1'b1; r_cs = c_a.sign ^ c_b.sign; r_ce = 1'b1;
         end else if (c_a.zero || c_b.zero) begin
-          res_direct = 1'b1; res_bits = zero_of(c_a.sign ^ c_b.sign);
-        end else begin
-          // p = man_a * man_b in [2^104, 2^106): value = p * 2^(ea + eb - 104);
-          // the top 58 bits, the rest sticky: man * 2^(ea + eb - 56) = man * 2^(exp - 55)
-          wide.sign = c_a.sign ^ c_b.sign;
-          wide.man = mul_p1[105:48];
-          wide.sticky = |mul_p1[47:0];
-          wide.exp = c_a.exp + c_b.exp - 14'sd1;
+          res_direct = 1'b1; r_cs = c_a.sign ^ c_b.sign;
         end
       end
 
@@ -414,24 +478,22 @@ module fpu
         if (c_a.nan || c_b.nan) begin
           res_direct = 1'b1;
           res_flags[FX_NV] = c_a.snan | c_b.snan;
-          res_bits = quiet(nan2, c_src_dbl);
+          r_kind = RK_OPND; r_sel = SEL_NAN2; r_fix = 1'b1;
         end else if ((c_a.inf && c_b.inf) || (c_a.zero && c_b.zero)) begin
-          res_direct = 1'b1; res_flags[FX_NV] = 1'b1; res_bits = default_nan(c_dst_dbl);
-        end else if (c_a.inf) begin res_direct = 1'b1; res_bits = inf_of(c_a.sign ^ c_b.sign, c_dst_dbl); end
-        else if (c_b.inf) begin res_direct = 1'b1; res_bits = zero_of(c_a.sign ^ c_b.sign); end
+          res_direct = 1'b1; res_flags[FX_NV] = 1'b1; r_ce = 1'b1; r_cf = 1'b1;
+        end else if (c_a.inf) begin res_direct = 1'b1; r_cs = c_a.sign ^ c_b.sign; r_ce = 1'b1; end
+        else if (c_b.inf) begin res_direct = 1'b1; r_cs = c_a.sign ^ c_b.sign; end
         else if (c_b.zero) begin
-          res_direct = 1'b1; res_flags[FX_DZ] = 1'b1; res_bits = inf_of(c_a.sign ^ c_b.sign, c_dst_dbl);
-        end else if (c_a.zero) begin res_direct = 1'b1; res_bits = zero_of(c_a.sign ^ c_b.sign); end
-        else wide = ds_r;
+          res_direct = 1'b1; res_flags[FX_DZ] = 1'b1; r_cs = c_a.sign ^ c_b.sign; r_ce = 1'b1;
+        end else if (c_a.zero) begin res_direct = 1'b1; r_cs = c_a.sign ^ c_b.sign; end
       end
 
       O_SQRT: begin
         if (c_b.nan) begin
-          res_direct = 1'b1; res_flags[FX_NV] = c_b.snan; res_bits = quiet(c_b_bits, c_src_dbl);
-        end else if (c_b.zero) begin res_direct = 1'b1; res_bits = c_b_bits; end
-        else if (c_b.sign) begin res_direct = 1'b1; res_flags[FX_NV] = 1'b1; res_bits = default_nan(c_dst_dbl); end
-        else if (c_b.inf) begin res_direct = 1'b1; res_bits = c_b_bits; end
-        else wide = ds_r;
+          res_direct = 1'b1; res_flags[FX_NV] = c_b.snan; r_kind = RK_OPND; r_sel = SEL_B; r_fix = 1'b1;
+        end else if (c_b.zero) begin res_direct = 1'b1; r_kind = RK_OPND; r_sel = SEL_B; end
+        else if (c_b.sign) begin res_direct = 1'b1; res_flags[FX_NV] = 1'b1; r_ce = 1'b1; r_cf = 1'b1; end
+        else if (c_b.inf) begin res_direct = 1'b1; r_kind = RK_OPND; r_sel = SEL_B; end
       end
 
       O_CMP, O_CMPE: begin
@@ -447,34 +509,28 @@ module fpu
         else if (c_b.inf)                   res_fcc = c_b.sign ? 2'd2 : 2'd1;
         else if (c_a.zero)                  res_fcc = c_b.sign ? 2'd2 : 2'd1;
         else if (c_b.zero)                  res_fcc = c_a.sign ? 2'd1 : 2'd2;
-        else if (c_a.exp == c_b.exp && c_a.man == c_b.man) res_fcc = 2'd0;
+        else if (sum == '0)                 res_fcc = 2'd0;   // equal (the signs are, here: |a| - |b|, the sticky in)
         else if (a_bigger)                  res_fcc = c_a.sign ? 2'd1 : 2'd2;
         else                                res_fcc = c_a.sign ? 2'd2 : 2'd1;
       end
 
-      O_ITOF: begin
-        // the 32-bit integer in b_bits[63:32]: value = |i| * 2^(55 - 55)
-        wide.sign = c_b_bits[63];
-        wide.man = 58'(itof_abs);
-        wide.exp = 14'sd55;
-        wide.sticky = 1'b0;
-      end
+      O_ITOF: ;                                 // always rounded: the operand is above
 
       O_FTOI: begin
         // round toward zero; out of range (beyond int32 after truncation) or NaN: invalid
         res_direct = 1'b1;
         if (c_b.nan) begin
-          res_flags[FX_NV] = 1'b1; res_bits = {32'h7FFF_FFFF, 32'd0};
+          res_flags[FX_NV] = 1'b1; r_ce = 1'b1; r_cf = 1'b1;     // 7FFFFFFF: the single default NaN pattern
         end else if (c_b.inf || c_b.exp > 14'sd31 ||
                      (c_b.exp == 14'sd31 && !(c_b.sign && ftoi_iv == 32'h8000_0000))) begin
           // (a negative value that truncates to exactly -2^31 is in range)
           res_flags[FX_NV] = 1'b1;
-          res_bits = {c_b.sign ? 32'h8000_0000 : 32'h7FFF_FFFF, 32'd0};
+          r_cs = c_b.sign; r_ce = !c_b.sign; r_cf = !c_b.sign;   // 80000000 = -0, 7FFFFFFF
         end else if (c_b.zero || c_b.exp < 14'sd0) begin
-          res_bits = '0;
+          // +0 (the default)
           res_flags[FX_NX] = !c_b.zero;
         end else begin
-          res_bits = {c_b.sign ? (32'd0 - ftoi_iv) : ftoi_iv, 32'd0};
+          r_kind = RK_INT;
           res_flags[FX_NX] = ftoi_inexact;
         end
       end
@@ -482,15 +538,9 @@ module fpu
       O_FTOF: begin
         if (c_b.nan) begin
           res_direct = 1'b1; res_flags[FX_NV] = c_b.snan;
-          res_bits = quiet(conv_nan(c_b_bits, c_src_dbl, c_dst_dbl), c_dst_dbl);
-        end else if (c_b.inf) begin res_direct = 1'b1; res_bits = inf_of(c_b.sign, c_dst_dbl); end
-        else if (c_b.zero) begin res_direct = 1'b1; res_bits = zero_of(c_b.sign); end
-        else begin
-          wide.sign = c_b.sign;
-          wide.man = {2'b0, c_b.man, 3'b0};    // leading one at 55: value = man * 2^(exp - 55)
-          wide.exp = c_b.exp;
-          wide.sticky = 1'b0;
-        end
+          r_kind = RK_OPND; r_sel = SEL_B; r_fix = 1'b1;
+        end else if (c_b.inf) begin res_direct = 1'b1; r_cs = c_b.sign; r_ce = 1'b1; end
+        else if (c_b.zero) begin res_direct = 1'b1; r_cs = c_b.sign; end
       end
 
       default: ;
@@ -508,7 +558,6 @@ module fpu
   // Control
   // ---------------------------------------------------------------------
   logic [63:0] fin_bits;
-  logic [4:0]  fin_flags;
   logic [63:0] f_bits;                 // the result as S_ROUND finishes
   logic [4:0]  f_flags;
   assign f_bits  = res_direct_q ? res_bits_q : rnd_bits;
@@ -531,7 +580,7 @@ module fpu
       c_op <= O_UNIMPL; c_src_dbl <= 1'b0; c_dst_dbl <= 1'b0; c_rd <= '0; c_inst <= '0; c_pc <= '0;
       c_a <= '0; c_b <= '0; c_two <= 1'b0;
       wait_cnt <= '0; ds_ok <= 1'b0;
-      fin_bits <= '0; fin_flags <= '0;
+      fin_bits <= '0;
     end else begin
       // ldfsr: everything but ver, ftt, qne and the reserved bits
       if (req_i.fsr_wr) begin
@@ -600,12 +649,11 @@ module fpu
         end
         S_ROUND: begin
           // (a tiny result: the rounder denormalises it first); the result
-          // is final now: the FSR and the state as in S_DONE, the register
-          // write next cycle
+          // is final now: the FSR and the state, the register write next
+          // cycle
           if (res_direct_q || !rnd_busy) begin
             ex <= S_IDLE;
             fin_bits <= f_bits;
-            fin_flags <= f_flags;
             if ((f_flags & fsr_tem) != 5'd0) begin
               fsr_ftt <= FTT_IEEE;
               fsr_cexc <= f_flags;
@@ -621,27 +669,11 @@ module fpu
           end
         end
         S_DONE: begin
+          // entered from S_START only, for an unimplemented FPop
           ex <= S_IDLE;
-          if (c_op == O_UNIMPL) begin
-            fsr_ftt <= FTT_UNIMPLEMENTED;
-            qne <= 1'b1;
-            state <= FP_PENDING;
-          end else if ((fin_flags & fsr_tem) != 5'd0) begin
-            // an enabled exception: no result, aexc and fcc unchanged, the FQ holds the op
-            fsr_ftt <= FTT_IEEE;
-            fsr_cexc <= fin_flags;
-            qne <= 1'b1;
-            state <= FP_PENDING;
-          end else begin
-            fsr_ftt <= FTT_NONE;
-            fsr_cexc <= fin_flags;
-            fsr_aexc <= fsr_aexc | fin_flags;
-            if (res_is_cmp_q) begin
-              fsr_fcc <= res_fcc_q;
-            end else begin
-              dp_wr <= 1'b1;
-            end
-          end
+          fsr_ftt <= FTT_UNIMPLEMENTED;
+          qne <= 1'b1;
+          state <= FP_PENDING;
         end
         default: ex <= S_IDLE;
       endcase
