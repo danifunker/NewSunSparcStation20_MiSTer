@@ -46,6 +46,7 @@ OPTIONS = {
     "boot-device":      (0x29f, "s", 0x102),
     "diag-device":      (0x423, "s", 0x102),
     "auto-boot?":       (0x5a8, "f", 1),
+    "sbus-probe-list":  (0x5a9, "s", 0x0a),
     "scsi-initiator-id": (0x5b3, "b", 1),
     "selftest-#megs":   (0x5b4, "n", 4),
     "screen-#rows":     (0x5b8, "b", 1),
@@ -61,11 +62,15 @@ OPTIONS = {
 
 # The defaults that are not zero (OpenBoot 2.x Command Reference), with
 # boot-device "disk" rather than "disk net": with no disk the PROM stops at
-# `ok` instead of waiting on the network.
+# `ok` instead of waiting on the network. sbus-probe-list has no fixed
+# default in the PROM: set-defaults stores "fe0123" when the IOMMU reports an
+# implementation (ours does) and "f0123" otherwise; left empty, OBP probes
+# no SBus slot, finds no TCX and prints "screen not found." on ttya.
 DEFAULTS = {
     "boot-device": "disk",
     "diag-device": "net",
     "auto-boot?": "true",
+    "sbus-probe-list": "fe0123",
     "scsi-initiator-id": "7",
     "selftest-#megs": "1",
     "screen-#rows": "34",
