@@ -9,8 +9,13 @@
 //   each, in order: the critical doubleword of an aligned line is the
 //   first). It goes first: the line buffer must not run dry.
 // - v_*: the TCX's VRAM master, one doubleword at a time: a read, or a
-//   write with byte enables (the SDRAM's DQM masks; a write is taken
-//   when the controller has its data and needs nothing more from here).
+//   write with byte enables. A write of the whole doubleword is one
+//   write; a partial one is read, merged and written whole: the SDRAM's
+//   DQM byte masks cannot be relied on (on the board, 2026-10-19, the
+//   bytes a partial write masked were written anyway: the TCX's text came
+//   out smeared while its fills were right; the HP 9000/715 core saw the
+//   same with DQM in its write bursts). A write is taken when the
+//   controller has its data and needs nothing more from here.
 //
 // Addresses are the masters' DDR word addresses (ss20_ddr_pkg::ddr_word of
 // VRAM_BASE + offset): within the 1 MB VRAM, bits 16:0 are the offset's
@@ -49,7 +54,7 @@ module vram_sdram (
   input  logic [63:0] ram_rdata
 );
 
-  typedef enum logic [1:0] {A_IDLE, A_SCAN, A_VRAM} astate_t;
+  typedef enum logic [1:0] {A_IDLE, A_SCAN, A_VRAM, A_MERGE} astate_t;
   astate_t     st;
   logic        req_pend;          // ram_req: up until the controller acks it
   logic [14:0] line;              // the scan's 32-byte line in the VRAM
@@ -68,7 +73,7 @@ module vram_sdram (
 
   assign ram_req   = req_pend;
   assign ram_line  = st == A_SCAN;
-  assign ram_we    = st == A_VRAM && v_we;
+  assign ram_we    = st == A_VRAM && v_we;   // (A_MERGE reads the doubleword first)
   assign ram_addr  = st == A_SCAN ? {7'd0, line, 5'd0} : {7'd0, v_dw, 3'd0};
   assign ram_be    = v_be;
   assign ram_wdata = v_wd;
@@ -99,7 +104,7 @@ module vram_sdram (
             v_be <= v_byteenable;
             v_wd <= v_writedata;
             req_pend <= 1'b1;
-            st <= A_VRAM;
+            st <= (v_write && v_byteenable != 8'hFF) ? A_MERGE : A_VRAM;
           end
         end
         A_SCAN: if (ram_rvalid) begin
@@ -114,6 +119,14 @@ module vram_sdram (
           end
         end
         A_VRAM: if (v_we ? ram_wready : ram_rvalid) st <= A_IDLE;
+        // a partial write: the doubleword read, the write's bytes merged
+        // in, then written whole (A_VRAM)
+        A_MERGE: if (ram_rvalid) begin
+          for (int b = 0; b < 8; b++) if (!v_be[b]) v_wd[8*b +: 8] <= ram_rdata[8*b +: 8];
+          v_be <= 8'hFF;
+          req_pend <= 1'b1;
+          st <= A_VRAM;
+        end
         default: st <= A_IDLE;
       endcase
     end

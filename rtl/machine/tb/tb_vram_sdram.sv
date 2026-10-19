@@ -43,7 +43,8 @@ module tb_vram_sdram;
     .ram_rvalid, .ram_rbeat, .ram_rdata,
     .SDRAM_DQ(DQ), .SDRAM_A(A), .SDRAM_BA(BA), .SDRAM_DQML(DQML), .SDRAM_DQMH(DQMH),
     .SDRAM_nCS(nCS), .SDRAM_nRAS(nRAS), .SDRAM_nCAS(nCAS), .SDRAM_nWE(nWE), .SDRAM_CKE(CKE));
-  sdram_chip #(.INV_CS(0)) rank0 (.clk, .nCS, .nRAS, .nCAS, .nWE, .ba(BA), .a(A),
+  // (as the board: the byte masks ignored)
+  sdram_chip #(.INV_CS(0), .IGNORE_DQM(1)) rank0 (.clk, .nCS, .nRAS, .nCAS, .nWE, .ba(BA), .a(A),
     .dqmh(DQMH), .dqml(DQML), .dq(DQ), .ctl_drives(u_sd.dq_oe));
 
   // the reference VRAM (a doubleword not yet written reads all ones, as

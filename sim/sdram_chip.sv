@@ -18,7 +18,10 @@
 /* verilator lint_off BLKSEQ */        // a behavioural model: blocking state, initialisers
 /* verilator lint_off PROCASSINIT */
 /* verilator lint_off WIDTHEXPAND */
-module sdram_chip #(parameter bit INV_CS = 0) (
+// IGNORE_DQM = 1 writes every byte whatever DQM says: what the MiSTer
+// board did (rtl/machine/vram_sdram.sv), so a bench can show that nothing
+// depends on the byte masks.
+module sdram_chip #(parameter bit INV_CS = 0, parameter bit IGNORE_DQM = 0) (
     input logic        clk,
     input logic        nCS, nRAS, nCAS, nWE,
     input logic [1:0]  ba,
@@ -68,10 +71,10 @@ module sdram_chip #(parameter bit INV_CS = 0) (
         if (wb_left > 0 && cmd == 3'b111) begin
             int k;
             k = key(2'(wb_bank), row[wb_bank], 10'(wb_col));
-            if (!dqmh || !dqml) begin
+            if (!dqmh || !dqml || IGNORE_DQM) begin
                 if (!mem.exists(k)) mem[k] = 16'hFFFF;
-                if (!dqmh) mem[k][15:8] = dq[15:8];
-                if (!dqml) mem[k][7:0] = dq[7:0];
+                if (!dqmh || IGNORE_DQM) mem[k][15:8] = dq[15:8];
+                if (!dqml || IGNORE_DQM) mem[k][7:0] = dq[7:0];
             end
             wb_col = (wb_col & ~(bl - 1)) | ((wb_col + 1) & (bl - 1));
             wb_left--;
@@ -112,10 +115,10 @@ module sdram_chip #(parameter bit INV_CS = 0) (
                     if (a[10]) begin row_open[ba] = 0; t_pre[ba] = now + bl; end
                 end else begin
                     k = key(ba, row[ba], 10'(col));
-                    if (!dqmh || !dqml) begin
+                    if (!dqmh || !dqml || IGNORE_DQM) begin
                         if (!mem.exists(k)) mem[k] = 16'hFFFF;
-                        if (!dqmh) mem[k][15:8] = dq[15:8];
-                        if (!dqml) mem[k][7:0] = dq[7:0];
+                        if (!dqmh || IGNORE_DQM) mem[k][15:8] = dq[15:8];
+                        if (!dqml || IGNORE_DQM) mem[k][7:0] = dq[7:0];
                     end
                     if (wburst && bl > 1) begin
                         wb_left = bl - 1; wb_bank = ba; wb_ap = a[10];
