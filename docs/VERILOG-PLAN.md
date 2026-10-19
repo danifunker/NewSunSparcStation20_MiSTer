@@ -45,7 +45,7 @@ this plan.
   branch #1345).** The new core speaks the same `hps_io` protocol, so
   Main needs no change:
   - ioctl index 0: the boot PROM (`boot0.rom`, `boot.rom`, or the OSD's
-    `FC0` Boot PROM);
+    `F0` Load ROM for one session);
   - ioctl index 64: the ID PROM seed;
   - SD slots: disk 0, disk 1, CD, and the NVRAM image (8 KB);
     `sd_blk_cnt` chunks of up to 32 blocks;
@@ -290,6 +290,22 @@ M (1-2 weeks), L (several weeks), XL (a month or more).
 - README, RELEASE-NOTES, a `releases/` rbf, and the OpenBIOS ROM built
   from `bios/`.
 
+### Phase 13: video memory on SDRAM, a 24-bit frame buffer (M)
+- **The core requires the SDRAM module** (user, 2026-10-18: almost every
+  MiSTer has one). Today the SDRAM pins are idle and the TCX's 1 MB VRAM
+  sits in DDR3, where its scan-out (~47 MB/s at 1024x768x8 bits, 60 Hz)
+  shares the port with the CPUs. Moving the VRAM and the scan-out to SDRAM
+  frees that DDR3 bandwidth for the CPUs (measure it) and makes room for a
+  deeper frame buffer.
+- Then a 24-bit mode, TCX's S24 (QEMU `tcx` depth 24; Solaris's driver;
+  check NetBSD's, Linux's and OpenBIOS's): 1024x768 at 60 Hz is ~190 MB/s
+  at 32 bits a pixel against ~200-260 MB/s for one 16-bit SDRAM, before
+  the CPUs' writes and the S24's per-pixel control plane. Design the
+  layout (3 bytes a pixel, the control bits kept small or on chip) before
+  the RTL.
+- Needs the area from the phase 12 shrink first (an SDRAM controller is a
+  few hundred ALMs).
+
 Order: 0 → 1 → 2 and 3 (in parallel once the IU runs) → 4 → 5 → 6 →
 7 → 8 → 9 → 10 → 11 → 12. Phase 9 can start after phase 5 if the bus
 was designed for SMP from the start (it should be).
@@ -333,11 +349,12 @@ the gitignored `scratch/third-party-rtl/`.
 | Sun keyboard/mouse | `Sun-2_MiSTer/rtl/sun2_mister_kbd_mouse.sv` | **GPL-3** | same |
 | SPARC V8 + SRMMU reference | GRLIB LEON3 (Frontgrade Gaisler) | GPL edition | read as reference; check its version |
 
-**A license decision for you:** our files are GPL-2.0-or-later and
-`sys/` is GPL-2+, so the core may become GPL-3 if a GPL-3 part is
-worth it. OpenBIOS is a separate firmware image, so it does not affect
-the core's license either way. Until you decide, use only GPL-2 or MIT
-parts.
+**License decision (user, 2026-10-18): GPL-3 parts are allowed.** Our
+files stay GPL-2.0-or-later and `sys/` is GPL-2+, so a build that
+includes a GPL-3 part (e.g. Sorgelig's `sdram.sv`, the GPL-3 entries in
+the table above) is distributed as GPL-3 as a whole; keep each outside
+file's license header. OpenBIOS is a separate firmware image, so it does
+not affect the core's license either way.
 
 ## 6. Behaviour requirements learned on the VHDL core
 
