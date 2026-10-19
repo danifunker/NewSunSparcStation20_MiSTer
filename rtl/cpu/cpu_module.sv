@@ -535,12 +535,23 @@ module cpu_module
       default:    return 36'h1FFF;
     endcase
   endfunction
+  // One write port (the sweep, a write, the status read-clear: exclusive,
+  // in that priority), so Quartus can infer the MLAB.
+  logic        bk_we;
+  logic [2:0]  bk_wa;
+  logic [35:0] bk_wd;
+  always_comb begin
+    if (ds == D_WD) begin
+      bk_we = wd_clr[wd_idx]; bk_wa = wd_idx; bk_wd = '0;
+    end else if (bk_wr) begin
+      bk_we = 1'b1;           bk_wa = bk_idx; bk_wd = dmr.wdata[35:0] & bk_wmask(bk_idx);
+    end else begin
+      bk_we = bk_rdclr;       bk_wa = 3'd3;   bk_wd = '0;
+    end
+  end
   always_ff @(posedge clk) begin
     bk_q <= bk_m[bk_idx];
-    if (ds == D_WD) begin
-      if (wd_clr[wd_idx]) bk_m[wd_idx] <= '0;
-    end else if (bk_wr)    bk_m[bk_idx] <= dmr.wdata[35:0] & bk_wmask(bk_idx);
-    else if (bk_rdclr)     bk_m[3'd3] <= '0;
+    if (bk_we) bk_m[bk_wa] <= bk_wd;
   end
 
   assign d_normal   = dmr.asi[7:2] == 6'b000010;              // 0x08-0x0B
