@@ -524,6 +524,26 @@ then boot.rom as index 0, so a boot.rom (the test scripts' ROM) wins.
    simulation: the boot-mode PROM pace (ss20_memctl PROM_WAIT, kept for
    the POST's counter/timer test), the caches being off in boot mode; make
    it faster where the POST still passes. Compare with a real SS20's time.
+   *(a) done 2026-10-19 (0a72b3c, then sbus-probe-list):* the cause was OBP
+   itself: a bad configuration checksum makes it set its defaults AND
+   diag-switch? true (the word after "Incorrect configuration checksum").
+   nvram_sd now writes the OBP defaults (rtl/pkg/obp_nvram_pkg.sv from
+   `tools/obp_nvram.py --sv`; diag-switch? false, boot-device disk) into an
+   empty NVRAM: at power-up and after loading a blank image. sbus-probe-list
+   must be "fe0123" (OBP computes it from the IOMMU; empty = no SBus probe,
+   "screen not found." on ttya and a black screen). Board, the image of the
+   defaults mounted: the banner 5 s after reset, Initializing Memory (all
+   464 MB, every start, even non-diag) done and `ok` at 16 s; printenv
+   matches OBP's own defaults. Build 2add56d (seed 3: clk_sys +1.020 ns,
+   HDMI +0.303, 36,279 ALMs, rbf 14ea4dfe), loaded through the OSD with NO
+   NVRAM image: banner by 9 s, Boot device sd@3,0 by 17 s, Solaris 8 to
+   CDE; psrinfo both CPUs on-line, 464 MB, `init 0` clean, printenv
+   diag-switch? false. OpenBIOS on 0a72b3c (the same Sun-format defaults)
+   booted Solaris to its login. (b) matters only in diag mode now.
+   Seen, not yet looked at: the TOD is not the MiSTer's time (Solaris
+   showed Oct 7 on Oct 19; OpenBIOS warns "Time-of-day chip had incorrect
+   date"); under OpenBIOS the screen's white is pale yellow, and Solaris's
+   text console after X is white on white (palette).
 7. As room is needed: the area list left in notes-area-20261019.md (the
    FPU's aligner/normaliser shifter shared, the cache valid bits in
    their own byte lanes, IU f_npc and the delay-slot search, ...).
