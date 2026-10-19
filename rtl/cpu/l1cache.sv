@@ -204,7 +204,7 @@ module l1cache
   logic [35:5] fill_other_line;
   assign fill_other_line = {r_pa[35:6], ~r_pa[5]};
   assign fill_tag_keep   = {(ICACHE && fill_other_gone) ? (fill_tag_hi & ~TAG_VMASK[31:24]) : fill_tag_hi, r_pa[35:12]};
-  logic        st_hit_written;
+  logic        st_hit_checked;
   logic        single_lock;
 
   assign r_set = r_pa[11:SET_LSB];
@@ -423,7 +423,11 @@ module l1cache
   logic st_hit_now;                // a write hit updates the line this cycle
   // (the I-cache has no stores: its st never reaches S_WRITE_WAIT or the
   // atomic states, which Quartus cannot see through st's encoding)
-  assign st_hit_now = !ICACHE && st == S_WRITE_WAIT && hit && !st_hit_written && r_cacheable;
+  // Only in S_WRITE_WAIT's first cycle, while the tags out are the ones
+  // read in the accept cycle at the store's own index: later idx_i may have
+  // moved (an IU reset by the watchdog while the store waits), and a match
+  // of r_pa against another set's tags would update a wrong line.
+  assign st_hit_now = !ICACHE && st == S_WRITE_WAIT && hit && !st_hit_checked && r_cacheable;
   logic fill_tag_go, fill_end_go, atomic_inval_go, snoop_rd_go, snoop_wr_go, flash_go, dg_tag_go, dg_data_go, mru_go;
   assign fill_tag_go     = st == S_FILL_START;
   // (a queued snoop compared in this very cycle read the tags before the fill's
@@ -558,17 +562,14 @@ module l1cache
   logic        hit_now, wr_now;
   assign hit_now = st == S_LOOKUP && !r_atomic && hit;
   assign wr_now  = !ICACHE && st == S_WRITE_WAIT && wb_room;
-  // A store's line update (port B) in the cycle the next request is taken
-  // (port A reads the same RAM): its bytes are forwarded to that request's
-  // compare cycle if it reads the same doubleword of the same way.
-  logic        fw_v;
-  logic [8:0]  fw_idx;
-  logic [WW-1:0] fw_way;
-  logic [7:0]  fw_be;
-  logic [63:0] fw_d;
+  // (A store's line update, port B, can never meet the next request's read
+  // of port A: the I-cache has no stores, and cpu_module gives the D-cache
+  // a request only in S_IDLE: it asks while the data side is idle, or
+  // holds its request until done_o, and never in done_o's cycle. So no
+  // store-to-load forward; an assertion after accept keeps that true.)
   // D-cache: one way mux for both hits. rdata_o is read only with done_o,
   // and of its terms done_q comes in S_IDLE with nothing else, hit_now in
-  // S_LOOKUP (the hit way, and the forward) and a fast hit in S_IDLE
+  // S_LOOKUP (the hit way) and a fast hit in S_IDLE
   // (fhit's way); stores ignore it. So the select is the state and done_q,
   // both early, not hit_now/fast_ld, which hang off the tag compare and
   // the micro-TLB: the load data path into the IU (m_rdata) is the
@@ -577,12 +578,7 @@ module l1cache
   logic [WW-1:0] rd_idx;
   logic [63:0] hit_data;
   assign rd_idx = (ICACHE || st != S_IDLE) ? hit_idx : fhit_idx;
-  always_comb begin
-    hit_data = da_rdata[rd_idx];
-    if ((ICACHE || st == S_LOOKUP) && fw_v && fw_idx == r_pa[11:3] && fw_way == hit_idx)
-      for (int b = 0; b < 8; b++)
-        if (fw_be[7 - b]) hit_data[8*(7-b) +: 8] = fw_d[8*(7-b) +: 8];
-  end
+  assign hit_data = da_rdata[rd_idx];
   assign done_o  = done_q | hit_now | wr_now | fast;
   assign fast_o  = fast;
   assign rdata_o = ICACHE ? (hit_now ? hit_data : fast_ld ? da_rdata[fhit_idx] : rdata_q)
@@ -595,6 +591,11 @@ module l1cache
   logic can_take, accept;
   assign can_take = !done_q && (st == S_IDLE || hit_now || wr_now) && fs == F_IDLE && !flash_v_i && !flash_l_i;
   assign accept   = req_i && can_take;
+`ifndef SYNTHESIS
+  always @(posedge clk)
+    if (!rst && !ICACHE && accept && st != S_IDLE)
+      $error("l1cache: the D-cache took a request outside S_IDLE (st %0d): a store's line update would need forwarding", st);
+`endif
   assign taken_o  = accept;
 
   // FAST_HIT: the port A outputs are this request's when last cycle's index
@@ -633,11 +634,10 @@ module l1cache
       r_we <= 1'b0; r_atomic <= 1'b0; r_cacheable <= 1'b0; r_pa <= '0; r_be <= '0; r_wdata <= '0;
       fill_beat <= '0; fill_err <= 1'b0; fill_snooped <= 1'b0; fill_way <= '0;
       fill_tag_hi <= '0; fill_other_gone <= 1'b0;
-      st_hit_written <= 1'b0; single_lock <= 1'b0;
+      st_hit_checked <= 1'b0; single_lock <= 1'b0;
       rdata_q <= '0; err_q <= 1'b0;
       sq_wr <= '0; sq_rd <= '0; sq_count <= '0;
       wb_rd <= '0; wb_wr <= '0; wb_cnt <= '0;
-      fw_v <= 1'b0; fw_idx <= '0; fw_way <= '0; fw_be <= '0; fw_d <= '0;
       qs <= Q_IDLE; q_cur <= '0; q_way_q <= '0; q_word_hi <= '0;
       fs <= F_IDLE; f_kind_l <= 1'b0; f_set <= '0;
       ds <= D_IDLE; diag_rdata_o <= '0;
@@ -684,7 +684,7 @@ module l1cache
         S_WRITE_WAIT: begin
           // the hit line (tags from the accept cycle) is updated once; the
           // store enters the write buffer when there is room, and answers
-          if (st_hit_now) st_hit_written <= 1'b1;
+          st_hit_checked <= 1'b1;         // (the hit is checked once, above)
           if (wb_room) begin              // answered now (wr_now); a request taken this cycle sets st below
             err_q <= 1'b0;
             st <= S_IDLE;
@@ -716,11 +716,6 @@ module l1cache
       endcase
 
       // the store's bytes for the next request's compare cycle
-      fw_v   <= st_hit_now && accept;
-      fw_idx <= r_pa[11:3];
-      fw_way <= hit_idx;
-      fw_be  <= r_be;
-      fw_d   <= r_wdata;
 
       // ---- the write buffer ----
       if (wb_push) begin
@@ -758,7 +753,7 @@ module l1cache
       end
       if (accept) begin
         err_q <= 1'b0;
-        st_hit_written <= 1'b0;
+        st_hit_checked <= 1'b0;
         fill_err <= 1'b0; fill_snooped <= 1'b0; fill_other_gone <= 1'b0;
         if (atomic_i) st <= S_LOOKUP;
         else if (!(cacheable_i && enable_i)) begin single_lock <= 1'b0; st <= S_SINGLE; end
