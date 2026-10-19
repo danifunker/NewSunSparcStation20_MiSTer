@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 //
-// Vendored from Wish7990 (MIT, MelkhiorVintageComputing,
+// Vendored from Wish7990 (MIT, rtl/sun4m/LICENSE.wish7990; MelkhiorVintageComputing,
 // https://github.com/MelkhiorVintageComputing/Wish7990, commit 8610ef5,
 // src/wb_arb.sv, as pinned by Sun-3_FPGA). Local changes: the module and
 // the modules it instantiates take a wish7990_ prefix. See

@@ -151,24 +151,24 @@ every change back, so `setenv` sticks.
 
 ## What is here
 
-| Path | What | License |
-|---|---|---|
-| `rtl/cpu/` | the CPU module: `iu` (pipeline) and its parts, `fpu` (`fp_unpack`, `fp_round`, `fp_divsqrt`), `srmmu`, `l1cache`, `cpu_module` (+ benches in `tb/`) | ours |
-| `rtl/machine/` | the machine: `ss20_machine` (NCPU modules, default 2), `ss20_mbus`, `ss20_memctl`, `ss20_iobridge`, `ss20_loader`, `ss20_uart`, `ss20_osd`, `vram_sdram` | ours |
-| `rtl/obio/` | the sun4m system devices: `slavio_timer`, `slavio_intctl`, `slavio_misc`, `m48t08`, `escc` | ours |
-| `rtl/sun4m/` | the SBus and on-board devices: `ss20_msi` (IOMMU), `emc`, `dma2`, `esp` + `scsi_targets`, `lance`, `tcx`, `cs4231` (+ APC), `fdc82077`, `sun_kbd`, `sun_mouse`, `kbd_beep`; the FCode PROMs `tcx_fcode`, `cs4231_fcode`, `slote_fcode` | ours, except below |
-| `rtl/mister/` | the MiSTer side: `ddram_arb`, `sdram64`, `eth_hps`, `nvram_sd` | ours |
-| `rtl/pkg/`, `rtl/lib/`, `rtl/video/` | packages, RAM templates, the hang reporter, video timing | ours |
-| `rtl/tb/` | `run.sh`: lint every module and run every block bench under Verilator | ours |
-| `sim/` | Verilator harnesses: the whole machine (`build.sh`, `sim_main.cpp`, `run-*.sh`), the CPU module (`sim/cpu/`), the IU (`sim/iu/`) | ours |
-| `tests/cpu/`, `tests/fpu/` | the bare-metal SPARC V8 / sun4m suite that runs as the boot PROM, with QEMU references; FPU vectors | ours |
-| `syn/` | a Quartus fit of the CPU module alone, for timing work | ours |
-| `scripts/` | build, deploy, board regression (`hwtest.sh`, `board/`) | ours |
-| `tools/` | ROM analysis (`romdis/`), FCode, NVRAM, CD-audio, UFS, NeXTSTEP, UnixBench and MiSTer tools | ours |
-| `docs/` | the plan ([VERILOG-PLAN.md](docs/VERILOG-PLAN.md)), the architecture (`arch/`), our analysis of the SS20 and SS5 PROMs (`rom-disassembly/`, no Sun code), benchmarks, the reference index | ours |
-| `bios/` | OpenBIOS and fcode-utils; `scripts/build-bios.sh` builds the boot ROM | GPL-2 |
-| `sys/` | the Template_MiSTer framework, unchanged | GPL-2+ |
-| `releases/` | the release: the rbf and the OpenBIOS `boot.rom` it needs | GPL |
+| Path | What |
+|---|---|
+| `rtl/cpu/` | the CPU module: `iu` (pipeline) and its parts, `fpu` (`fp_unpack`, `fp_round`, `fp_divsqrt`), `srmmu`, `l1cache`, `cpu_module` (+ benches in `tb/`) |
+| `rtl/machine/` | the machine: `ss20_machine` (NCPU modules, default 2), `ss20_mbus`, `ss20_memctl`, `ss20_iobridge`, `ss20_loader`, `ss20_uart`, `ss20_osd`, `vram_sdram` |
+| `rtl/obio/` | the sun4m system devices: `slavio_timer`, `slavio_intctl`, `slavio_misc`, `m48t08`, `escc` |
+| `rtl/sun4m/` | the SBus and on-board devices: `ss20_msi` (IOMMU), `emc`, `dma2`, `esp` + `scsi_targets`, `lance`, `tcx`, `cs4231` (+ APC), `fdc82077`, `sun_kbd`, `sun_mouse`, `kbd_beep`; the FCode PROMs `tcx_fcode`, `cs4231_fcode`, `slote_fcode` |
+| `rtl/mister/` | the MiSTer side: `ddram_arb`, `sdram64`, `eth_hps`, `nvram_sd` |
+| `rtl/pkg/`, `rtl/lib/`, `rtl/video/` | packages, RAM templates, the hang reporter, video timing |
+| `rtl/tb/` | `run.sh`: lint every module and run every block bench under Verilator |
+| `sim/` | Verilator harnesses: the whole machine (`build.sh`, `sim_main.cpp`, `run-*.sh`), the CPU module (`sim/cpu/`), the IU (`sim/iu/`) |
+| `tests/cpu/`, `tests/fpu/` | the bare-metal SPARC V8 / sun4m suite that runs as the boot PROM, with QEMU references; FPU vectors |
+| `syn/` | a Quartus fit of the CPU module alone, for timing work |
+| `scripts/` | build, deploy, board regression (`hwtest.sh`, `board/`) |
+| `tools/` | ROM analysis (`romdis/`), FCode, NVRAM, CD-audio, UFS, NeXTSTEP, UnixBench and MiSTer tools |
+| `docs/` | the plan ([VERILOG-PLAN.md](docs/VERILOG-PLAN.md)), the architecture (`arch/`), our analysis of the SS20 and SS5 PROMs (`rom-disassembly/`, no Sun code), benchmarks, the reference index |
+| `bios/` | OpenBIOS and fcode-utils; `scripts/build-bios.sh` builds the boot ROM |
+| `sys/` | the Template_MiSTer framework, unchanged |
+| `releases/` | the release: the rbf and the OpenBIOS `boot.rom` it needs |
 
 Not here, on purpose: Sun PROM images and anything reproduced from them.
 
@@ -186,24 +186,24 @@ Not here, on purpose: Sun PROM images and anything reproduced from them.
 A big thank you to **Grabulosaure**, whose SPARCstation work on FPGA
 inspired us to write this core.
 
-## Third-party components
+## Credits
 
-These keep their own licenses and authors:
-
-- **OpenBIOS** (`bios/openbios/`), GPL-2.0: the OpenBIOS project, with
-  the sparc32 port for FPGA SPARCstations (`CONFIG_TACUS`) by
-  Grabulosaure, which we extend for this machine.
-- **fcode-utils** (`bios/fcode-utils/`), GPL-2.0: the OpenBIOS project.
-- **The TCX FCode PROM** (`rtl/sun4m/tcx_fcode.sv`), GPL-2.0: the image
-  QEMU ships (`pc-bios/QEMU,tcx.bin`), built from OpenBIOS's
-  `drivers/tcx.fs`.
-- **Template_MiSTer** (`sys/`), GPL-2.0+: the MiSTer project
-  (Sorgelig and contributors).
-- **Wish7990** (`rtl/sun4m/wish7990_*.sv`, `rtl/pkg/wish7990_pkg.sv`),
-  MIT: MelkhiorVintageComputing, the Am7990 LANCE core.
+- **OpenBIOS** (`bios/openbios/`) and **fcode-utils** (`bios/fcode-utils/`):
+  the OpenBIOS project, with the sparc32 port for FPGA SPARCstations
+  (`CONFIG_TACUS`) by Grabulosaure, which we extend for this machine.
+- **The TCX FCode PROM** (`rtl/sun4m/tcx_fcode.sv`): the image QEMU ships
+  (`pc-bios/QEMU,tcx.bin`), built from OpenBIOS's `drivers/tcx.fs`.
+- **Template_MiSTer** (`sys/`): the MiSTer project (Sorgelig and
+  contributors).
+- **Wish7990** (`rtl/sun4m/wish7990_*.sv`, `rtl/pkg/wish7990_pkg.sv`):
+  MelkhiorVintageComputing, the Am7990 LANCE core.
 
 ## License
 
-GPL-2.0-or-later for our files ([LICENSE](LICENSE)); the components above
-under their own licenses. The Sun PROM images are Sun/Oracle copyright
-and are never committed.
+GPL version 2 ([LICENSE](LICENSE)); our own files are GPL-2.0-or-later.
+
+The one exception is **Wish7990**, under the MIT license
+([rtl/sun4m/LICENSE.wish7990](rtl/sun4m/LICENSE.wish7990)), which is
+compatible with the GPL.
+
+Sun's PROM images are Sun/Oracle copyright and are never committed.
