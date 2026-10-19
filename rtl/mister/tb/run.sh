@@ -1,7 +1,7 @@
 #!/bin/sh
 # Benches for the DDRAM arbiter (iverilog):
 #   tb_ddram_arb.sv          randomised, masters wait for their read data
-#   tb_ddram_arb_pipe.sv     randomised, pipelined masters (like plomb_avalon64)
+#   tb_ddram_arb_pipe.sv     randomised, pipelined masters (Avalon bridges)
 #   tb_ddram_arb_abandon.sv  a write burst abandoned mid-way is flushed
 #   tb_ddram_arb_lat.sv      throughput vs DDR latency (report only)
 # and, under Verilator through rtl/tb/run.sh (self-checking, tb_pkg):

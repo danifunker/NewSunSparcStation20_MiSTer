@@ -3,8 +3,8 @@
 // tb_scsi_targets: the SCSI target engine between a behavioural ESP (the
 // initiator side of the record bus, as scsi_targets.sv's header describes
 // it) and a model of hps_io's block interface serving known images. The
-// cases follow what the old core's whole-machine sim/run-scsi.sh and the
-// CPU suite's scsitest.S check, at the level of the target engine:
+// cases follow what the whole-machine sim/run-scsi.sh and the CPU
+// suite's scsitest.S check, at the level of the target engine:
 //   - the probe: INQUIRY (disk, CD, LUN 1, VPD pages), TEST UNIT READY,
 //     READ CAPACITY; selection only of present targets (an unmounted disk
 //     does not answer, the CD answers without a disc);
@@ -988,8 +988,8 @@ module tb_scsi_targets;
     expect_check(ID_HD0, 4'h6, 8'h29, "after BUS DEVICE RESET: UNIT ATTENTION 29h");
 
     // ATN in the middle of a long read, a block request in flight (a slow
-    // hps_io): MESSAGE OUT, ABORT; no stray requests after it (the VHDL
-    // went on reading here, see the RTL's header)
+    // hps_io): MESSAGE OUT, ABORT; no stray requests after it (h_left
+    // saturates, see the RTL)
     sd_lat = 3000;
     select(ID_HD0, 1'b1, ok);
     wait_req(ph);

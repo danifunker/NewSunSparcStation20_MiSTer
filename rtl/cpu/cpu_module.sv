@@ -20,9 +20,9 @@ module cpu_module
   import cpu_pkg::*;
 #(
   parameter bit HAS_FPU = 1'b1,
-  parameter bit          SS20    = 1'b1,    // SYSCONF (ASI 4 VA 0xD00, the old core's private register, read by
+  parameter bit          SS20    = 1'b1,    // SYSCONF (ASI 4 VA 0xD00, a private register read by
                                             // OpenBIOS and the suite): RAM MB (ram_mb_i) in 31:20, SS20 in bit 4,
-  parameter logic [1:0]  NCPU_M1 = 2'd0     // the CPU count minus one in 1:0 (docs/legacy/HARDWARE_GAPS.md:150)
+  parameter logic [1:0]  NCPU_M1 = 2'd0     // the CPU count minus one in 1:0
 )(
   input  logic        clk,
   input  logic        rst,

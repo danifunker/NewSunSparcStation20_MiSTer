@@ -1,16 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// snoop_queue — the snoops the CPU hybrid shows the module: its own
-// accepted write beats and the I/O master's (DMA) write beats, queued on the
-// bus clock, one delivered per CPU cycle in the register the CPU reads
-// (loaded when ld_i is high, as everything the CPU sees).
+// snoop_queue — cpu_sim's snoop broadcast: the module's own accepted write
+// beats and the harness's DMA write beats, queued, one delivered per CPU
+// cycle in the register the CPU reads (loaded when ld_i is high).
 //
-// Written from docs/arch/bus.md (snoop_t) and the hybrid's needs. Not part
-// of the new core.
+// Written from docs/arch/bus.md (snoop_t). Simulation only.
 //
 // Two pushes may come in one cycle (own and DMA); consecutive beats of one
 // line fold into the entry pushed last. The queue never drops a DMA snoop
-// as long as DMA writes arrive slower than one line per two bus cycles (the
-// old core's DMA writes a line in eight beats); the shim holds its own write
+// as long as DMA writes arrive slower than one line per two bus cycles (a
+// DMA master writes a line in eight beats); the harness holds its own write
 // beats while full_o is high, so the module's stores cannot starve the DMA
 // snoops (a polling loop that stores every iteration did, and the cached
 // copy of a DMA buffer went stale). While the module holds (hold_i: its
@@ -31,7 +29,7 @@ module snoop_queue
   parameter logic [3:0] OWN_MID = 4'd8,
   parameter logic [3:0] DMA_MID = 4'd0,
   parameter int         RESNOOP = 0,      // bus cycles after which each DMA line is snooped again (0: never)
-  parameter int         RW      = 16      // its FIFO: at least RESNOOP / (bus cycles a DMA line); the old core's DMA needs >= 8
+  parameter int         RW      = 16      // its FIFO: at least RESNOOP / (bus cycles a DMA line)
 )(
   input  logic        clk,
   input  logic        rst,

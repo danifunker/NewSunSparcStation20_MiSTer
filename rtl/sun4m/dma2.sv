@@ -11,8 +11,7 @@
 //   NetBSD dev/ic/lsi64854reg.h, lsi64854.c (the bits drivers use, the
 //   parallel port's layout); QEMU hw/dma/sparc32_dma.c (ledma's address
 //   = E_BASE_ADDR | the LANCE's 24 bits); OpenBIOS drivers/esp.c;
-//   docs/VERILOG-PLAN.md §6 DMA-5; docs/legacy/impl-gaps/chipset.md §5
-//   (DMA-1 to DMA-6).
+//   docs/VERILOG-PLAN.md §6 DMA-5.
 //
 // Registers (32-bit; byte writes merge by byte enables, except to D_CSR,
 // D_ADDR, D_BCNT and E_CSR, which take only whole words: a narrower write

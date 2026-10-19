@@ -1,7 +1,7 @@
 /* Main memory is cached even where the PTE says C = 0 (PLAN.md A4 item 5,
  * E3): the Sun OBP 2.25 maps everything it gives a client program
  * uncacheable on a module without an E-cache, so boot loaders ran uncached
- * (NetBSD's install CD 899 s to its installer). The SS20 MMU (mcu_multi)
+ * (NetBSD's install CD 899 s to its installer). The SS20 MMU
  * sets C in a TLB entry whose page is in main memory (pa[35:32] = 0)
  * while snooping is on (MCNTL.SE), whatever the PTE's C bit. What keeps
  * that safe is checked too: the OSes keep their page tables uncached on

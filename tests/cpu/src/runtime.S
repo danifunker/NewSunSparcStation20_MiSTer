@@ -38,7 +38,7 @@ reset:
         /* Every CPU leaves reset and starts here: the core has no MP
          * start/stop control yet. Only CPU 0 runs the suite; the others
          * park. The core reports the CPU number in MMU control register
-         * bits 3:2 (the TEMLIB "MID" field, reserved on a real SuperSPARC).
+         * bits 3:2 (reserved on a real SuperSPARC).
          * QEMU starts the secondary CPUs halted, and CPU 0 reads 0 there. */
         lda [%g0] 4, %l0
         srl %l0, 2, %l0

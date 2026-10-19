@@ -69,10 +69,10 @@ module tb_slavio_misc;
     bus_read(SYSCTL, v);  check32(v, 32'h0, "system control: no status bits after POR");
     rd8(AUX0, b);         check(b == 8'hC0, "Aux 0: bits 7:6 read 1, the rest 0");
     rd8(POWER, b);        check(b == 8'h00, "power register clear");
-    bus_read(AUX0, v);        check32(v, 32'hC012_0044, "TACUS word 0: HWCONF 0x12, video present, CG3");
-    bus_read(AUX0 + 8, v);    check32(v, 32'd55_000_000, "TACUS +8: the CPU clock");
-    bus_read(AUX0 + 'h1C, v); check32(v, 32'h5A00_01D0, "TACUS +0x1C: 0x5A and 464 MB");
-    bus_read(AUX0 + 'h18, v); check32(v, 32'h0, "TACUS +0x18: no Direct SD");
+    bus_read(AUX0, v);        check32(v, 32'hC012_0044, "config word 0: HWCONF 0x12, video present, CG3");
+    bus_read(AUX0 + 8, v);    check32(v, 32'd55_000_000, "config +8: the CPU clock");
+    bus_read(AUX0 + 'h1C, v); check32(v, 32'h5A00_01D0, "config +0x1C: 0x5A and 464 MB");
+    bus_read(AUX0 + 'h18, v); check32(v, 32'h0, "config +0x18: no Direct SD");
     check(!power_off && !pwr_irq && !led, "outputs quiet");
 
     // ---- LEDs: 16-bit write-only register ----

@@ -5,11 +5,9 @@
  * A line's tag is written valid when the fill starts; the data arrives
  * over the following cycles. The CPU side must therefore stay blocked
  * until the last beat has been written, even when the beats come with
- * gaps. The SS20's mcu_multi_ext.vhd lost that block on every gap
- * (filling_end was never cleared, so filling_d/filling_i meant "a beat
- * arrived last cycle"), and a load, store or fetch of a not yet written
- * word of the line hit the way's previous contents: Solaris 8 and NetBSD
- * corrupted memory and jumped into garbage under disk I/O (2026-10-02).
+ * gaps. A cache that drops the block on a gap lets a load, store or fetch
+ * of a not yet written word of the line hit the way's previous contents:
+ * Solaris 8 and NetBSD then corrupt memory under disk I/O.
  * In simulation, sim/obj_ss20/Vsim_top --ddr-gaps reproduces the board's
  * bus; without gaps the tests pass with or without the fix. */
 #include "macros.h"

@@ -56,10 +56,6 @@ sim/out/
 # OpenBIOS out-of-tree build (scripts/build-bios.sh)
 bios/build/
 
-# tools/debugarm build outputs (ARM binaries, built with make)
-tools/debugarm/*.o
-tools/debugarm/debug
-tools/debugarm/pcdump
 
 # Sun PROM images and anything reproduced from them: never commit
 # (docs/VERILOG-PLAN.md 1.1; keep them in scratch/private/)

@@ -8,8 +8,7 @@ are the labels in [`romdis.json`](romdis.json). Test names in `###` headings
 are the ROM's own strings (without the leading `\r\n` and padding).
 
 Values and algorithms come from the instructions (cited by address); anything
-inferred is marked "(guess)". The one-word **Core** verdict per test
-(present / absent / unknown) comes from a quick grep of `src/`, not an audit.
+inferred is marked "(guess)".
 
 ## Summary
 
@@ -35,8 +34,8 @@ group. There is no interactive POST menu in this build: the menu strings
 (`0x15d02-0x15fe0`) and the key handler `post_console_command` (0x11ba0) are
 unreferenced.
 
-What a core has to provide to get through POST is summarised in
-§11.3.
+What a core has to provide to get through POST is summarised in the
+"Notes for the CPU test suite" of each group and in §11.
 
 ## 1. Conventions and execution order
 
@@ -130,7 +129,6 @@ unexpected-trap message.
 - **Expected:** 0 then 0xffffffff in every global; `%g0` = 0.
 - **Fails with:** 0x12db0 "ERROR : IU Register File Bit Failure", 0x12e74 "STATUS :
   Global Registers" + dump (`post_iu_fail_globals` 0x590c).
-- **Core:** present (plain IU registers).
 
 ### IU window registers and window pointer (no name string)
 - Entry: `post_iu_window_test` 0x41dc, inline in `post_entry` after the globals.
@@ -153,8 +151,6 @@ unexpected-trap message.
 - **Fails with:** 0x12ddc "ERROR : IU Register File Window Pointer" + "STATUS : In
   Registers" dump (`post_iu_fail_window` 0x5b64); 0x12db0 "IU Register File Bit
   Failure" + In/Local/Out dump (0x5a9c / 0x59d4 / 0x5c2c).
-- **Core:** present (`NWINDOWS => 8` in `cpu_conf_pack.vhd`, which the loop count
-  assumes).
 
 ### SuperSPARC-II BIST status check (dead code)
 - Entry: `post_dead_bist_check` 0x4050; skipped by the unconditional `ba` at
@@ -164,7 +160,6 @@ unexpected-trap message.
   and 0x01c00a00, clear control bit 3 (parity enable) with `stda`.
 - The strings 0x12d38 "*** RUNNIG SHORT BIST ***" and 0x12d54 "Viking Signature:
   %1 BIST Status = %2" belong to it and are unreferenced.
-- **Core:** absent (no ASI 0x39 BIST).
 
 ### Checks built into the POST infrastructure
 
@@ -176,13 +171,9 @@ CPUs, and they print the banner:
   `post_exit_to_obp(0xff, "... NO POST run")`; MXCC and non-MXCC SuperSPARCs
   may not be mixed (NVRAM 0x1ff1 == 3 → `post_fail_mixed_modules` 0x16c94,
   "TMS390Z55 and TMS390Z50 Modules can NOT be mixed. No POST run.").
-  **Core:** present — PSR 0x40, MCNTL impl/ver 0x01, MB = 1 → "TI,
-  TMS390Z50(3.x) 0Mb External cache".
 - **Slave presence** (`mp_probe_slaves` 0x1f56c): a slave that does not answer
   its mailbox within 50000 polls is "******* NOT installed *******" and loses
-  its arbitration. **Core:** unknown (needs the arbiter-enable stop/start of
-  README §5; `ts_decode.vhd` routes 0xFE to the IOMMU block, the arbiter
-  semantics were not checked).
+  its arbitration.
 - **Keyboard** (`kbd_detect` 0x18828): "$$$$$ WARNING : No Keyboard Detected!
   $$$$$" (0x132c8) is only a warning.
 
@@ -242,8 +233,6 @@ store buffer ASIs 0x30-0x32. No test in this group uses the expected-trap protoc
   %1, exp[63:32] = %2, obs[63:32] = %3, xor[63:32] = %4". A lo-word mismatch goes to 0x7108,
   which prints 0x12b00 (the same text for [31:00]). Both then print 0x13727 "U-NUMBER : Suspect
   Viking Module" and set %g3=1.
-- **Core**: absent. `mcu_multi.vhd` ASI_CACHE_DATA_DATA (0x0F) acks the access and does nothing,
-  so reads return undefined data.
 
 ### D-Cache PTAG Write/Read Test
 - Entry: `0x6ef4`, called from post_main `0x16680` (also from 0x6da0).
@@ -261,9 +250,6 @@ store buffer ASIs 0x30-0x32. No test in this group uses the expected-trap protoc
   - After writing zeros, the tag reads back as 0/0.
   - 512 tags are tested.
 - **Fails with**: 0x70a8 (0x129f8, hi) or 0x7108 (0x12b00, lo), then 0x13727, with %g3=1.
-- **Core**: absent. ASI 0x0E reads and writes `dcache_t_dr(0)`, which is the core's own 32-bit
-  MESI tag (V/M/SH/history). There is no Viking layout and no way select ("<AFAIRE> Sélection
-  voie").
 
 ### D-Cache STAG Write/Read Test
 - Entry: `0x7004`, called from post_main `0x16694` (also from 0x6da0). The xref "0x204c8a"
@@ -279,7 +265,6 @@ store buffer ASIs 0x30-0x32. No test in this group uses the expected-trap protoc
 - **Touches**: ASI 0x0e VA `0x40000000 | set<<5`, 64-bit r/w.
 - **Expected**: lo = 0x00000f0e (MRU[11:8] and lock[3:1]), then 0. 128 sets are tested.
 - **Fails with**: 0x7108 (0x12b00 "exp[31:00]"), then 0x13727, with %g3=1.
-- **Core**: absent. The core has no set tag / MRU / lock state behind ASI 0x0E.
 
 ### I-Cache RAM Write/Read Test
 - Entry: `0xcf2c`, called from post_main `0x166b8` (also from the dead runner 0xcee0).
@@ -294,7 +279,6 @@ store buffer ASIs 0x30-0x32. No test in this group uses the expected-trap protoc
 - **Expected**: the readback equals what was written. 2560 dwords are tested.
 - **Fails with**: a hi mismatch goes to 0xd1cc (0x129f8), a lo mismatch to 0xd22c (0x12b00);
   both then print 0x13727 and set %g3=1.
-- **Core**: absent. ASI 0x0D is acked and does nothing.
 
 ### I-Cache PTAG Write/Read Test
 - Entry: `0xd034`, called from post_main `0x166cc` (also from 0xcee0).
@@ -308,8 +292,6 @@ store buffer ASIs 0x30-0x32. No test in this group uses the expected-trap protoc
 - **Expected**: after all-ones, hi = 0x03000000 (0xd09c) and lo = 0x00ffffff; after zeros,
   0/0. 320 tags are tested. There is no check on module type here.
 - **Fails with**: 0xd1cc (0x129f8) or 0xd22c (0x12b00), then 0x13727.
-- **Core**: absent. ASI 0x0C crosses over to the I side (sCROSS) and returns
-  `icache_t_dr(0)` in the core's own format.
 
 ### I-Cache STAG Write/Read Test
 - Entry: `0xd124`, called from post_main `0x166f0` (also from 0xcee0).
@@ -322,7 +304,6 @@ store buffer ASIs 0x30-0x32. No test in this group uses the expected-trap protoc
 - **Touches**: ASI 0x0c VA `0x40000000 | set<<6`, 64-bit r/w.
 - **Expected**: lo = 0x00001f1e (MRU[12:8] and lock[4:1]), then 0. 64 sets are tested.
 - **Fails with**: 0xd22c (0x12b00), then 0x13727.
-- **Core**: absent. There is no STAG state behind ASI 0x0C.
 - (Note: the listing has labels L_0000d120..L_0000d1c0 with "xref 0004dXXXb". These are false
   xrefs from data at 0x4dXXX.)
 
@@ -347,7 +328,6 @@ store buffer ASIs 0x30-0x32. No test in this group uses the expected-trap protoc
 - **Fails with**: 0x9e90 (lock) or 0x9e30 (MRU), both printing 0x12b00 "exp[31:00]". 0x9dd0
   (valid) prints 0x129f8 "exp[63:32]". All three print Address=VA, exp=0, obs=masked value,
   then 0x13727.
-- **Core**: absent. ASI 0x36/0x37 fall into `WHEN OTHERS` in mcu_multi.vhd and do nothing.
 
 ### Cache Flashclear Test
 - Entry: `0x1cbd8` (C code), called from post_main `0x16718`.
@@ -381,7 +361,6 @@ store buffer ASIs 0x30-0x32. No test in this group uses the expected-trap protoc
   - Either is followed by "U-NUMBER : Suspect Viking Module, MBus Slot 0" (0x1db45 or
     0x1dbf7). The test sets g3=1 through 0x1ba6c and returns 0xff. An error is printed only
     if g3 was clear.
-- **Core**: absent. ASI 0x36/0x37 do nothing, and there is no STAG.
 
 ### D-Cache Flush Test
 - Entry: `0x9b40`. Not called (dead code): no call, branch, pointer or constant anywhere in
@@ -401,7 +380,6 @@ store buffer ASIs 0x30-0x32. No test in this group uses the expected-trap protoc
 - **Expected**: as in the I-Cache Flush Test, with the D-cache masks 0xf, 0xf00 and 0x01000000.
 - **Fails with**: 0x9e90, 0x9e30 or 0x9dd0 (the same shared exits as the I-cache flush test),
   then 0x13727.
-- **Core**: absent.
 
 ### D-Cache Write Hit Special Test
 - Entry: `0x1cf20` (C code). Not called (dead code; no reference anywhere).
@@ -448,8 +426,6 @@ store buffer ASIs 0x30-0x32. No test in this group uses the expected-trap protoc
   after wr-hit", 0x1dd76 "wrong data lo after wr-hit", 0x1ddf9 "wrong mem data after wr-hit".
   Each is followed by "U-NUMBER : Suspect Viking Module, MBus Slot 0" and returns -1 (0xff
   from the runner).
-- **Core**: absent (diag ASIs). The behaviour being checked is present: mcu_multi.vhd is a
-  MESI write-back cache, and the core's SS MCNTL reads bits[11:10] = "10", so MB=1.
 
 ### Name strings with no code in this ROM
 These strings at 0x142c2-0x14582 have no reference anywhere; they are name strings only, with
@@ -524,24 +500,24 @@ are never used as store-buffer diag accesses.
     `call`, then `tst %g3`.
 - **Keep the structure of the C Flashclear test.** Its runner depends on g3/g4 and on NVRAM
   byte 0x1ff2 for printing. Reimplementing the 4 flash types directly is simpler.
-- **Viking features the core would need to pass these:**
+- **Viking features a core would need to pass these:**
   - The diag ASI decode for way and set.
   - 64-bit PTAG with V/D/S at bits 56/48/40, and a 24-bit PA tag.
   - Per-set STAG with MRU and lock fields.
   - Two flash-clear flavours.
   - Data diag access through ASI 0x0d/0x0f.
-  - The core's geometry differs (4-way I-cache; `WAY_ICACHE => 4` in cpu_conf_pack), so a
-    faithful model is an emulation layer rather than a direct view of the tag RAM.
-- **The write-hit test is the most useful for the MESI core, even without the diag ASIs.**
+  - A core whose cache geometry differs from Viking's needs an emulation layer rather than
+    a direct view of its tag RAM.
+- **The write-hit test is the most useful for a write-back MESI core, even without the diag ASIs.**
   Its memory-contents check alone is a good write-back test:
   1. Map a region cacheable.
   2. Fill it by loads.
   3. Store to every word (all write hits).
   4. Read back through ASI 0x20 bypass.
-  - With MB=1 (as the core reports), memory must still hold the old values. A cached `ld`
-    must return the new ones.
-  - This requires that the core's bypass reads neither snoop nor flush its own dirty lines.
-    Real Viking returns memory; for the core this is unknown and needs checking.
+  - With MB=1, memory must still hold the old values. A cached `ld` must return the new
+    ones.
+  - This requires that bypass reads neither snoop nor flush the CPU's own dirty lines, as
+    on a real Viking, which returns memory.
   - Dependencies: at least 16 MB RAM (tables at 0xf80000), an SRMMU table walk, MCNTL
     ME/BM/SE/DC/IC, and copying the PROM to pa 0 so that code keeps running when BM is
     cleared.
@@ -624,9 +600,6 @@ would map VA 0x80000.. onto the PROM. So all MMU-on suite tests need PTP0 inject
 - **Fails with**: case 0xf 0x20c7f `"Case %1: I_TLB  mis-matched exp=%2 obs=%3 xor= %4"` +
   `" entry # 0x%1"`. QEMU prints `Case 0000000f: I_TLB mis-matched exp=55555000
   obs=00000000 ... entry # 0x00000000` (first write, entry 0 SEL0): QEMU has no TLB diag.
-- **Core**: absent - ASI 5/6/7 are accepted as no-ops ("Diagnostic, on s'en fout",
-  rtl/cpu/mcu_multi.vhd:692-699); the suite is also skipped because the core reports
-  MCNTL impl/ver 0x01 (cpu_conf_pack.vhd:131) -> module type 0x40.
 
 ### MMU ICACHE_TLB context flush Test / region / segment / page / entire flush Test
 - Entry: `0x1fdb0` (`post_mmu_icache_tlb_flush_test`, args `%i0`=case, `%i1`=shift,
@@ -647,8 +620,6 @@ would map VA 0x80000.. onto the PROM. So all MMU-on suite tests need PTP0 inject
   obs=%3 ..."`, 0x20d01 region, 0x20d42 segment, 0x20d83 pages, 0x20dc4 entire; then
   0x213fe `"U-NUMBER : Suspect Viking Module, MBus Slot 0"`. ROM bug: `" entry # 0x%1"`
   prints `entry_index >> 12` = 0, because 0x1feec passes the index, not the address.
-- **Core**: absent - no I-TLB diag (mcu_multi.vhd:692-699); flush itself exists
-  (mcu_multi.vhd:656) but its effect is invisible without ASI 5.
 
 ### MMU DCACHE_TLB.RBO_LCK Test
 - Entry: `0x688c` (`post_mmu_dcache_tlb_rbo_lck_test`), called from 0x1fc80.
@@ -661,7 +632,6 @@ would map VA 0x80000.. onto the PROM. So all MMU-on suite tests need PTP0 inject
   xor= %4"` + entry #.
 - After this test the suite checks `%g2 & 4` (memory present, guess); if clear it sets
   `%g3` and calls `post_fail_no_dsimm` 0x16d54 (0x1fc94-0x1fcb0) before the RAM tests.
-- **Core**: absent - no ASI 6 diag, no RBO (mcu_multi.vhd:692-699).
 
 ### MMU D_cached_level2_PTP_test / MMU I_cached_level2_PTP_test / MMU Cached_root_pointer_PTP0_test
 - Entry: `0x205a0` (`post_mmu_cached_ptp_test`, `%i0` = 0 D-PTP2, 1 I-PTP2, 2 PTP0),
@@ -681,7 +651,6 @@ would map VA 0x80000.. onto the PROM. So all MMU-on suite tests need PTP0 inject
   `"I_Cached_l2_PTP error: exp_ptp=0x701 obs=%1, exp_vaddr=0 obs=%2"`, 0x215fb / 0x2164b /
   0x2169b / 0x216ec `"D_Cached_l2_PTP_entry#0..3 error: exp_ptp=0x301..0x601 obs=%1,
   exp_vaddr=0x80000..0x140000 obs=%2"`. No U-number.
-- **Core**: absent - no PTP0/PTP2 diag access; the core walks from the CTPR (mcu_tw.vhd).
 
 ### MMU TLB_HIT Test
 - Entry: `0x202e0` (`post_mmu_tlb_hit_test`), called from 0x1fd18.
@@ -695,8 +664,6 @@ would map VA 0x80000.. onto the PROM. So all MMU-on suite tests need PTP0 inject
   unexpected here: `%g5` is not set).
 - **Fails with**: 0x21560 `"Tlb_hit error addr=%1 exp=%2 obs=%3"`; MMU restored (BM on, ME
   off) before return -1.
-- **Core**: absent - 4 D-TLB entries (rtl/cpu/mcu_pack.vhd:24) plus an L2 TLB cache (L2TLB,
-  NB_L2TLB 7) of unknown use here; tables also need PTP0 injection.
 
 ### MMU TLB_MISS Test
 - Entry: `0x1ffa4` (`post_mmu_tlb_miss_test`), called from 0x1fd34.
@@ -714,7 +681,6 @@ would map VA 0x80000.. onto the PROM. So all MMU-on suite tests need PTP0 inject
   `"I_TLB_miss PTE error: exp= 0x3E obs=%1 xor=%2"` (non-fatal), 0x214cb
   `"D_Tlb_miss_RAM error entry# %1 exp=0xAE obs=%2 xor=%3"`, 0x21503 `"D_Tlb_miss_test:
   #%1_of tlb miss is not matched (%1)"`.
-- **Core**: absent - needs ASI 5/6 reads, 62 D-TLB entries, PTP0 injection.
 
 ### MMU TLB_PROBE test
 - Entry: `0x201cc` (`post_mmu_tlb_probe_test`), called from 0x1fd50.
@@ -724,8 +690,6 @@ would map VA 0x80000.. onto the PROM. So all MMU-on suite tests need PTP0 inject
   (probe type 1 = segment). After the loop 0x202a8 clears L2[2..63]; MMU restored.
 - **Expected**: probe == `(v >> 4) | 0xee` (PPN of v, C, M, R, ACC 3, ET 2), e.g. 0x80ee.
 - **Fails with**: 0x2153a `"TLB_probe error exp = %1  obs = %2 "`.
-- **Core**: unknown - probe via table walk exists (mcu_multi.vhd:656-680, mcu_tw.vhd
-  PROBE), but without PTP0 injection VA 0x80000 walks to the PROM PTE instead.
 
 ### ENDIAN-ness Test with IU_registers
 - Entry: `0x6250` (`post_endian_ness_test_with_iu_registers`), called from 0x1fd6c.
@@ -745,7 +709,6 @@ would map VA 0x80000.. onto the PROM. So all MMU-on suite tests need PTP0 inject
   0x6268 (last call's `%o7`) and also prints the "BAD DSIMM" line. ROM bug: cases 0x15-0x18
   put the case number in `%o0` (delay slots 0x62cc/0x6310/0x633c/0x6388), so the string
   index is 0x300000 (garbage text). A failure with DE=1 returns with PSR.DE still set.
-- **Core**: absent - `type_psr` has no bit 15 (rtl/cpu/iu_pack.vhd:53-65).
 
 ### ENDIAN-ness Test with FPU_registers
 - Entry: `0x65b0` (`post_endian_ness_test_with_fpu_registers`), called from 0x1fd88.
@@ -759,7 +722,6 @@ would map VA 0x80000.. onto the PROM. So all MMU-on suite tests need PTP0 inject
   0x21/0x22 DE=1 both -> equal; 0x23/0x24 std DE=1, ldd DE=0 -> `%f10`/`%f11`.
 - **Fails with**: case 0x19-0x24 strings 0x20f09..0x211d4 (`st_big_ldf_big` ..
   `std_litle_lddf_big_lowwrd`); same branch-to-sub_1fb00 return quirk (to 0x65c8).
-- **Core**: absent - no PSR.DE (iu_pack.vhd:53-65).
 
 ### MMU Context Table Reg Test
 - Entry: `post_main` 0x16544 prints 0x14642, then `0xf8dc`
@@ -771,8 +733,6 @@ would map VA 0x80000.. onto the PROM. So all MMU-on suite tests need PTP0 inject
   0x80000000.
 - **Fails with**: `"<<< CPU_%1 on MBus Slot_%2 >>>"` + 0x129b7 `"ERROR : Address = %1, exp =
   %2, obs = %3, xor = %4"` (address 0x100) + 0x13727 `"U-NUMBER : Suspect Viking Module"`.
-- **Core**: present - CTPR stores d(31:2) as PA[35:6] (mcu_multi.vhd:2156-2158); only
-  register bits 5:2 are forced to 0, outside the mask.
 
 ### MMU Context Register Test
 - Entry: `post_main` 0x16578 prints 0x14662, then `0xf8dc` with `%o0`=0x200, `%o1`=0xfff.
@@ -780,9 +740,6 @@ would map VA 0x80000.. onto the PROM. So all MMU-on suite tests need PTP0 inject
 - **Expected**: bits 11:0 read back (SuperSPARC has 16 context bits, public knowledge; the
   TLB SEL1 patterns above also use 16).
 - **Fails with**: as above, Address = 0x200.
-- **Core**: present, but too narrow - NB_CONTEXT = 8 (cpu_conf_pack.vhd:132,
-  mcu_multi.vhd:2163 keeps d(7:0)), so the walk fails at bit 8: `exp = 00000100, obs =
-  00000000`.
 
 ### MMU TLB Bit Pattern Tests
 - Entry: `post_main` 0x165ac prints 0x14622, then `0xf6dc` (`post_mmu_tlb_bit_pattern_test`)
@@ -799,9 +756,6 @@ would map VA 0x80000.. onto the PROM. So all MMU-on suite tests need PTP0 inject
   (bit 6) here, unlike the I-TLB. Ends with all entries 0 (invalid, unlocked).
 - **Fails with**: 0xf758: CPU banner + 0x129b7 (Address = diag address `entry<<12|SEL<<8`)
   + 0x13727 `"U-NUMBER : Suspect Viking Module"`, `%g3` = 1.
-- **Core**: absent - ASI 6 is a no-op (mcu_multi.vhd:692-699); a read returns whatever the
-  data port holds (guess: `cache_d_v`, mcu_multi.vhd:631), so the first compare fails.
-  On the core this test is not reached anyway: the Context Register Test fails first.
 
 ### MMU Flush Tests
 - Entry: `0x1c5c8` (`post_mmu_flush_tests`), called from `post_main` 0x16648 (also from the
@@ -822,8 +776,6 @@ would map VA 0x80000.. onto the PROM. So all MMU-on suite tests need PTP0 inject
   Slot 0"`. Only the first error prints (`get_g3` check). ROM quirk: the l1 error path does
   not return -1 and nothing clears `%g3`, so the caller (0x1c64c) re-runs mode 1 until a
   `%g4` bit-2 skip request, even if the retry passes.
-- **Core**: absent - flush exists (mcu_multi.vhd:656) but the result is only observable
-  through ASI 6.
 
 ### Dead code: MMU TLB Hit, Index 1-3 / Index 1-2 / Index 1 / Context Test (0xf218)
 - Entry: `0xf218` (`post_mmu_tlb_hit_index_tests`), reached only from the uncalled wrapper
@@ -840,7 +792,6 @@ would map VA 0x80000.. onto the PROM. So all MMU-on suite tests need PTP0 inject
   0x00050367 (LVL 3), #7 0x40f00000 / 0x000600ef (LVL 3 even though the name says 1-2),
   #8 0x21000000 ctx 1 / 0x00000065 (LVL 1, 16 MB), #0 tag 0 ctx 2 / 0x00000064 (LVL 0).
 - **Fails with**: 0xf7b8 banner + 0x129b7 + 0x13727.
-- **Core**: n/a (dead); would need ASI 6 TLB writes.
 
 ### Dead code: MMU TLB Read Miss Test (0xf4dc) / MMU TLB Write Miss Test (0xf5e8)
 - Entry: `0xf4dc` / `0xf5e8`, only from the uncalled wrapper 0xf120.
@@ -854,7 +805,6 @@ would map VA 0x80000.. onto the PROM. So all MMU-on suite tests need PTP0 inject
   obsolete test). Nothing checks that the trap was taken; the "No trap taken, expected %1"
   printer 0xf818 is unreferenced.
 - **Fails with**: 0xf7b8 (address, exp, obs, xor) + 0x13727.
-- **Core**: n/a (dead).
 
 ### Helpers
 - `0x1fb00` ss2_mmu_case_fail: print case string `0x208b0+case*0x41`, entry # for case > 0xd,
@@ -892,7 +842,7 @@ would map VA 0x80000.. onto the PROM. So all MMU-on suite tests need PTP0 inject
   diag-visible 64 x (tag, ctx16, PTE32, lock) RAM with flush matching (context: ctx ==
   context reg; region/segment/page: ctx match + VA[31:24]/[31:18]/[31:12] match and LVL >=
   1/2/3; entire: all) that clears bit 5 of SEL2 would do. The context register must hold
-  at least 12 bits (the core has 8: current POST failure point, guess that it is the first).
+  at least 12 bits.
 - The MMU-on suite tests (PTP, TLB_HIT/MISS/PROBE) need RAM at pa 0x1000-0x7200 (tables)
   and 0x80000-0xfc0004 (>= 16 MB), code mapped at VA 0..0x7ffff (the ROM maps the PROM; a
   RAM-resident suite must map itself instead), PTP0 injection through ASI 6 SEL4,
@@ -984,7 +934,6 @@ enabled. fp_disabled (tt 0x04) is never exercised.
 - **Fails with:** 0x1391f "ERROR : FPU Registerfile Stuck-at Fault" (from 0xbff0). It then
   dumps all 16 pairs with 0x12e5c "%1 : %2 %3" (register number, hi, lo) and prints 0x13727
   "U-NUMBER : Suspect Viking Module".
-- **Core:** present. fpu_regs_2r1w is a 16x64 register file and LDDF/STDF are implemented.
 
 ### FPU Misaligned Reg Pair Test
 - Entry: `0xa4bc`, called from `0x9f38`.
@@ -1002,8 +951,6 @@ enabled. fp_disabled (tt 0x04) is never exercised.
   `bne`, not `fbne`. They test icc left by the `tst %o0` at 0xa4f0 (Z = 1), so the compare
   result is never checked. **Only "no trap" is actually tested.**
 - **Fails with:** (unreachable) 0x1394e "FPU Single-precision Operation" (via 0xc19c).
-- **Core:** present. In fpu_multi.vhd an LDDF picks its halves with ld_hilo, ignoring
-  n_fd(0), so %f1 behaves as %f0.
 
 ### FPU Single-precision Tests
 - Entry: `0xa57c`, called from `0x9f4c`.
@@ -1037,7 +984,6 @@ enabled. fp_disabled (tt 0x04) is never exercised.
 - **Fails with:** 0x1394e "ERROR : FPU Single-precision Operation, exp = %1, obs = %2"
   (0xc19c), after 0x16088 "<<< CPU_%1 on MBus Slot_%2 >>>", then "Suspect Viking Module".
   ROM quirk: obs is printed from %l1 (stale 0x42480000), not %l2.
-- **Core:** present (fpu_calc: add/mul/div units).
 
 ### FPU Double-precision Tests
 - Entry: `0xa800`, called from `0x9f60`.
@@ -1062,7 +1008,6 @@ enabled. fp_disabled (tt 0x04) is never exercised.
 - **Expected:** all 6 results are 0x40390000_00000000.
 - **Fails with:** 0x13997 "ERROR : FPU Double-precision Operation, exp = %1 %2, obs = %3 %4"
   (0xc1f4), with exp = l0/l1 and obs = l2/l3.
-- **Core:** present.
 
 ### Exception-test summary
 
@@ -1118,8 +1063,6 @@ Failure strings shared by every test in this table (each preceded by
 - **Touches:** FSR (ld/st), pa 0x600000 (word), and the handler's 0x600010/0x600018.
 - **Expected:** trap tt 8 taken at 0xaa58; [0x600000] = 0; FSR.cexc bit 4.
 - **Fails with:** see the summary table.
-- **Core:** present. fpu_multi.vhd:331 sets ftt = 1 and cexc; iu_pipe5.vhd:893-900 raises
-  TT_FP_EXCEPTION on the next FP instruction, including FP loads and stores.
 
 ### FPU SP Overflow CEXC Test
 - Entry: `0xaaac`, called from `0x9fdc`.
@@ -1127,7 +1070,6 @@ Failure strings shared by every test in this table (each preceded by
 - **Expected:** tt 8; [0x600000] = 0; FSR & 0x08 (OF). An extra NX bit is allowed, since only
   bit 3 is tested.
 - **Fails with:** see the summary table.
-- **Core:** present.
 
 ### FPU SP Underflow CEXC Test
 - Entry: `0xab90`, called from `0xa004`. Skipped when get_module_type = 0x17 (HyperSPARC).
@@ -1135,15 +1077,12 @@ Failure strings shared by every test in this table (each preceded by
 - **Expected:** tt 8; FSR & 0x04 (UF). This requires an IEEE trap, not ftt = 2
   (unfinished_FPop), for a tiny result.
 - **Fails with:** see the summary table.
-- **Core:** present. DENORM_HARD = true, so the unfinished_FPop path (fpu_multi.vhd:323) is
-  disabled.
 
 ### FPU SP Divide-by-0 CEXC Test
 - Entry: `0xac70`, called from `0xa018`.
 - **Algorithm:** 25.0 / 0.0 (fdivs at 0xad00).
 - **Expected:** tt 8; FSR & 0x02 (DZ).
 - **Fails with:** see the summary table.
-- **Core:** present.
 
 ### FPU SP Inexact CEXC Test
 - Entry: `0xad58`, called from `0xa02c`.
@@ -1151,7 +1090,6 @@ Failure strings shared by every test in this table (each preceded by
   (fadds at 0xadf4). This exercises the sticky/rounding logic.
 - **Expected:** tt 8; FSR & 0x01 (NX).
 - **Fails with:** see the summary table.
-- **Core:** present.
 
 ### FPU SP Trap Priority >  Test
 - Entry: `0xae4c`, called from `0xa040`.
@@ -1163,7 +1101,6 @@ Failure strings shared by every test in this table (each preceded by
   %g5 = 0 and FSR & 2. The target is **not** read back.
 - **Expected:** tt 8, DZ.
 - **Fails with:** see the summary table.
-- **Core:** present.
 
 ### FPU SP Trap Priority <  Test
 - Entry: `0xaf24`, called from `0xa054`.
@@ -1180,11 +1117,6 @@ Failure strings shared by every test in this table (each preceded by
   handler), then tt 8 on the aligned store. On HyperSPARC, a single tt 8.
 - **Fails with:** "No trap taken"; or unexpected trap type 08 if the FPU exception is taken
   first; plus the common strings.
-- **Core:** **likely FAILS** (static reading, not simulated). iu_pipe5.vhd:892-900
-  overwrites the LSU's TT_MEM_ADDRESS_NOT_ALIGNED with TT_FP_EXCEPTION whenever fexc = 1 on an
-  FP load/store. The store waits for the fdivs result (fpu_multi.vhd dependency check), so
-  fexc is already set when it executes, and tt 8 arrives while %g5 = 7, which ends in
-  trap_unexpected_sync. Both V8 and the SuperSPARC path want tt 7 first.
 
 ### FPU SP UE Trap Priority Test
 - Entry: `0xb054`, called from `0xa068`.
@@ -1214,9 +1146,6 @@ Failure strings shared by every test in this table (each preceded by
 - **Expected:** tt 8, memory unchanged, DZ.
 - **Fails with:** "Did Not Block Store" with addr = 0x503240, exp = 0xd5a5a5a5; plus the
   common strings.
-- **Core:** EMC absent. pa 0xf_0000_0000 is not decoded (ts_decode.vhd), so reads return
-  0xBADACCE5 and writes are ignored. No ECC is injected, but the test still passes if the
-  store is blocked.
 
 ### FPU DP Invalid CEXC Test
 - Entry: `0xb464`, called from `0xa08c`.
@@ -1227,28 +1156,24 @@ Failure strings shared by every test in this table (each preceded by
   - Both read-back words must be 0 (0xb520, 0xb530). Then FSR & 0x10.
 - **Expected:** tt 8, NV.
 - **Fails with:** see the summary table.
-- **Core:** present.
 
 ### FPU DP Overflow CEXC Test
 - Entry: `0xb568`, called from `0xa0a0`.
 - **Algorithm:** DBL_MAX + DBL_MAX (faddd at 0xb600).
 - **Expected:** tt 8, FSR & 0x08.
 - **Fails with:** see the summary table.
-- **Core:** present.
 
 ### FPU DP Underflow CEXC Test
 - Entry: `0xb668`, called from `0xa0c8`. Skipped on HyperSPARC.
 - **Algorithm:** DBL_MIN * DBL_MIN (fmuld at 0xb6f8).
 - **Expected:** tt 8, FSR & 0x04.
 - **Fails with:** see the summary table.
-- **Core:** present.
 
 ### FPU DP Divide-by-0 CEXC Test
 - Entry: `0xb760`, called from `0xa0dc`.
 - **Algorithm:** 25.0 / 0.0 (fdivd at 0xb7f4).
 - **Expected:** tt 8, FSR & 0x02.
 - **Fails with:** see the summary table.
-- **Core:** present.
 
 ### FPU DP Inexact CEXC Test
 - Entry: `0xb85c`, called from `0xa0f0`.
@@ -1257,7 +1182,6 @@ Failure strings shared by every test in this table (each preceded by
 - **Expected:** tt 8, FSR & 0x01.
 - **Fails with:** see the summary table. ROM quirk: the first read-back branch at 0xb924 is a
   non-annulled `bne`, which is harmless.
-- **Core:** present.
 
 ### FPU DP Trap Priority >  Test
 - Entry: `0xb968`, called from `0xa104`.
@@ -1265,7 +1189,6 @@ Failure strings shared by every test in this table (each preceded by
   `std %f4,[0x00801000]` at 0xba04. Checks %g5 and FSR & 2; no read-back.
 - **Expected:** tt 8, DZ.
 - **Fails with:** see the summary table.
-- **Core:** present.
 
 ### FPU DP Trap Priority <  Test
 - Entry: `0xba44`, called from `0xa118`.
@@ -1277,8 +1200,6 @@ Failure strings shared by every test in this table (each preceded by
   - Both words at 0x600000 must be 0. Then FSR & 2.
 - **Expected:** tt 7 then tt 8 (SuperSPARC).
 - **Fails with:** see the summary table.
-- **Core:** **likely FAILS**, for the same priority override as in the SP version
-  (iu_pipe5.vhd:892-900).
 
 ### FPU DP UE Trap Priority Test
 - Entry: `0xbb8c`, called from `0xa12c`.
@@ -1293,7 +1214,6 @@ Failure strings shared by every test in this table (each preceded by
     0xbd0c: ECC off again.
 - **Expected:** tt 8, DZ.
 - **Fails with:** "Did Not Block Store" (addr 0x503240); plus the common strings.
-- **Core:** EMC absent. The test passes if the store is blocked.
 
 ### FPU DP CE Trap Priority Test
 - Entry: `0xbd1c`, called from `0xa140` (last test).
@@ -1308,10 +1228,6 @@ Failure strings shared by every test in this table (each preceded by
   - 0xbe74: ECC off. EFSR (holding CE) is cleared later by the runner at 0xa15c.
 - **Expected:** tt 8, a corrected read of 0, DZ.
 - **Fails with:** "Did Not Block Store" (addr 0x503260, exp 0); plus the common strings.
-- **Core:** **FAILS without an EMC.** ECC injection and correction are absent, so the raw
-  word 0x00000008 is read back and the test reports "Did Not Block Store ... obs =
-  00000008". The ECC tests earlier in post_main would already have failed on the same missing
-  EMC.
 
 ### FPU SP CE Trap Priority Test
 - Entry: `0xb1c4`, not called (dead code). The runner has a `nop` at 0xa07c in its call slot,
@@ -1321,7 +1237,6 @@ Failure strings shared by every test in this table (each preceded by
   - fdivs at 0xb2ac; `st %f3,[0x503260]` at 0xb2b0.
   - A word read with ECC on must give 0 (0xb2c8). Then FSR & 2.
 - **Fails with:** see the summary table.
-- **Core:** the EMC is absent, so it would fail like the DP CE test.
 
 ### FPU SP Data Store Trap Test
 - Entry: `0xb318`, not called (dead code).
@@ -1338,7 +1253,6 @@ Failure strings shared by every test in this table (each preceded by
 - **Notes:** this appears to need the MMU on with a page table (HyperSPARC flow). The SFAR
   (0x500020) does not match this test's store address (0x500000); it looks copied from the
   DP version.
-- **Core:** unknown (dead code).
 
 ### FPU DP Data Store Trap Test
 - Entry: `0xbe84`, not called (dead code).
@@ -1347,7 +1261,6 @@ Failure strings shared by every test in this table (each preceded by
   - Both words at 0x500020 must be 0. FSR & 2 (a failure goes to 0xc19c, ROM bug).
   - HyperSPARC: SFSR = 0x3aa, SFAR = 0x500020, then SFSR = 0 (0xbf90-0xbfd8).
 - **Fails with:** 0xc310 "Address = ..." and the common strings.
-- **Core:** unknown.
 
 #### Helpers
 - `trap_fp_exception` 0x5884 (vector tt 0x08): checks tt against %g5, drains the FQ
@@ -1381,20 +1294,19 @@ Failure strings shared by every test in this table (each preceded by
   through %g3, a result word in RAM, or the unexpected-trap path.
 
 **Priority checks**
-- The most valuable single checks for the core are the SP/DP Trap Priority < tests.
-- By static reading (not simulated), iu_pipe5.vhd:892-900 gives fp_exception priority over
-  mem_address_not_aligned on FP load/stores, the opposite of V8 Table 7-1.
-- The POST's SuperSPARC path expects tt 7 first, so the real ROM should stop with
-  "Unexpected Synchronous Trap Taken, Trap Type 08" in "FPU SP Trap Priority < Test". The
-  HyperSPARC path (module type 0x17) accepts tt 8 first.
+- The most valuable single checks are the SP/DP Trap Priority < tests: on an FP load/store,
+  mem_address_not_aligned must win over fp_exception (V8 Table 7-1).
+- The POST's SuperSPARC path expects tt 7 first; a core that gives fp_exception priority
+  stops with "Unexpected Synchronous Trap Taken, Trap Type 08" in "FPU SP Trap Priority <
+  Test". The HyperSPARC path (module type 0x17) accepts tt 8 first.
 
 **Needs the memory controller**
 - SP/DP UE and CE Trap Priority need the EMC at pa 0xf_0000_0000:
   - ECC Diagnostic reg 0x18 with DMODE = 01 to write chosen check bits.
   - ECC Enable reg 0x0 for EE.
   - EFSR 0x8 to clear errors.
-- They also need real ECC generate/check/correct in the RAM path. The core has none of this.
-  The UE tests reduce to "blocked store leaves memory unchanged" and pass. The CE test cannot
+- They also need real ECC generate/check/correct in the RAM path. Without it the UE tests
+  reduce to "blocked store leaves memory unchanged" and pass. The CE test cannot
   pass without correction, because it expects the injected 0x00000008 to read back as 0.
 - A suite should either implement an EMC model, or turn the CE test into a plain
   blocked-store test with a nonzero pre-load.
@@ -1452,10 +1364,6 @@ in the same order, including "MXCC E-Cache Data RAM Test (1 MB E$DATA RAM, MXCC_
 - Stream-op timeout: poll the RDY bit up to 1000 (0x3e8) times. Interrupt wait: a 20-iteration
   busy loop (about 40 instructions) after the triggering `stda`.
 
-**Core:** the whole group is **absent**. The SS-mode MCNTL readback in rtl/cpu/mcu_multi.vhd
-(~l.1378) has constant `"10"` at bits 11:10 (MB = 1), and ASI 2 is only a commented-out constant
-in asi_pack.vhd. So post_main skips the group silently: the "MXCC not installed" string is never
-printed, because post_main performs the check itself.
 
 **MXCC programming model, as the ROM uses it** (bit numbers are 63..0 of the ldda/stda pair; hi =
 first word, lo = second word). Cross-checked with Sun4M arch spec B.III, text/Sun4M_SystemArchitecture_edited2.txt.
@@ -1485,7 +1393,6 @@ Entry `0x197ac`, called from post_main 0x16740 (only when MB = 0).
   Cacheable Write (0x1b584). After each test, `%g3 != 0` ends the group (0x198ac).
 - 0x198a4: write 0x20 to the memory delay register. This happens only when everything passed; an
   error exit leaves 0x2895.
-- **Core:** absent (MB = 1).
 
 ### MXCC Register Test
 Entry `0x198b4`, called from runner 0x197e0.
@@ -1515,7 +1422,6 @@ value. The other registers must be readable without a trap.
 **Fails with:** 0x1bc42 "CPU_%1 error: dbl word register, asi %2, addr %3" + 0x1bc75 "exp %1 %2,
 obs %3 %4", then retries forever (0x1992c/0x199d4).
 
-**Core:** absent (no ASI 2).
 
 ### MXCC E-Cache Tag RAM Test
 Entry `0x19b80`, called from runner 0x197fc.
@@ -1542,7 +1448,6 @@ Pattern-tests every E$ tag.
 0x13727 "U-NUMBER : Suspect Viking Module". It sets `%g3 = 1` and returns -1, and the test exits.
 Apparent ROM bug: 0xecc4 uses `%fp` as scratch, which corrupts the caller's `%sp` on this path.
 
-**Core:** absent.
 
 ### MXCC E-Cache Data RAM Test
 Entry `0x19c5c`, called from runner 0x1982c, only when NVRAM[0x1ff2] == 2.
@@ -1562,7 +1467,6 @@ March test of E$ data lines through the diagnostic path.
 **Fails with:** 0x1bd2b + 0x1bd39 "f_error: wrong e$ data addr %1, exp %2 %3, obs %4 %5", or
 0x1bd6f + 0x1bd7d "b_error: …". The helper returns -1 and the test exits.
 
-**Core:** absent.
 
 ### MXCC Non-Cache Block Zero Test
 Entry `0x19fe4`, called from runner 0x19848. **Needs a DSIMM in slot 0**: `%g2 & 7` (the
@@ -1579,7 +1483,6 @@ SLOT 0, TEST SKIPPED >>" (printed only in full-diag mode).
 **Fails with:** 0x1bdfc "timeout on stream wr, dest = %2", 0x1be2f "target memory asi 20, addr
 %2, exp %3, obs %4"; retries forever (0x1a080).
 
-**Core:** absent.
 
 ### MXCC Non-Cache Block Copy Test
 Entry `0x1a628`, called from runner 0x19864. **Needs a DSIMM in slot 0** (0x1a65c, string
@@ -1625,7 +1528,6 @@ data reg", 0x1c03f "destination memory word", 0x1c091 "ce intr 15 on stream read
 0x1c0e9 "ecc fsr", 0x1c131 "ecc far", 0x1c1c9 "ue intr 15 … g3=%3 g5=%4" and 0x1c22e "mxcc error
 reg after ue". It retries forever.
 
-**Core:** absent.
 
 ### MXCC Cacheable Block Read Test
 Entry `0x1af04`, called from runner 0x19880. **Needs a DSIMM in slot 0** (string 0x1c288).
@@ -1660,8 +1562,6 @@ Checks cacheable stream reads against the E$ state of the source sub-block.
 stream data reg", 0x1c34e "parity error intr 15 … did not occur", 0x1c3b1 "mxcc error reg after
 parity error", 0x1c411 "e$ tag". It retries forever.
 
-**Core:** absent. A future MXCC model would also need E$ byte-parity emulation (PE = 0 writes
-poison the data), or this test fails.
 
 ### MXCC Cacheable Block Write Test
 Entry `0x1b584`, called from runner 0x1989c. **Needs a DSIMM in slot 0** (string 0x1c46b).
@@ -1687,7 +1587,6 @@ Entry `0x1b584`, called from runner 0x1989c. **Needs a DSIMM in slot 0** (string
 "e$ dest tag" (it prints 0x01c00220 as the address, a ROM slip), 0x1c56e "destination memory".
 It retries forever.
 
-**Core:** absent.
 
 ### mxcc parity error test
 Entry `0x1a228`. **Not called (dead code).** It forces a byte-parity error into E$ data and
@@ -1706,7 +1605,6 @@ checks that the error is reported through module control space.
 
 **Fails with:** 0x1be8b "no trap on e$ parity error", 0x1bee6 "mxcc_err reg".
 
-**Core:** absent.
 
 ### MXCC Parity RAM Test
 Entry `0x1a4c8`. **Not called (dead code).** It initialises E$ parity for a fixed 0x2000 lines
@@ -1716,14 +1614,12 @@ Entry `0x1a4c8`. **Not called (dead code).** It initialises E$ parity for a fixe
 0x11111111_11111111, descending read + write 0. Parity off. There are no compares; errors can
 only show up as unexpected parity traps.
 
-**Core:** absent.
 
 ### E-cache tag neighbour test (no name string)
 Entry `0x19d44`. **Not called (dead code).** It writes tag(line) = pattern masked with
 0xf/0xfff8eeee, writes tag(line+1 mod 1 MB) = ~pattern, then reads tag(line) back. Error 0x1bcfd
 "error: e$ tag addr %1, exp %2 %3, obs %4 %5".
 
-**Core:** absent.
 
 ### 0x195b0-0x19720 (not BIST)
 This range is dead memory-config helpers plus one live routine; no ASI 0x39 or MXCC BIST
@@ -1762,7 +1658,7 @@ This range is dead memory-config helpers plus one live routine; no ASI 0x39 or M
   into ASI 2 0x40000000 (guess: sun4c system-enable leftover).
 
 #### Notes for the CPU test suite
-- **Today:** the core reports MB = 1, so none of this runs. The only thing to assert is that MCNTL
+- **Without an MXCC** (MB = 1) none of this runs. The only thing to assert is that MCNTL
   bit 11 reads 1. Also note: for module type 0x42 the banner calls 0x19720 without checking MB
   (0x1ef8c). A core that reports MCNTL.ver 8..15 must then tolerate ASI 2 word accesses at
   0x01000008 / 0x01100008 / 0x01c00a04.
@@ -1855,9 +1751,6 @@ failures go to `post_fail_no_dsimm` (0x16d54).
   by code) and 0x12888 (VSIMM: code&7 -> 2M/4M/8M/16M at 2..5). Slot base tables 0x12828 (slot*64MB) and 0x12868
   (0xf0000000..0xfc000000 for slots 4..7).
 - **Fails with**: nothing (pure probe).
-- **Core**: unknown. There is no EMC/VCR (writes are ignored), and `sel_decodage_smp` sends every pa[35]=0 access to
-  RAM, so the result depends on RAM aliasing. Aliased 0x9000_0000 read-backs will make it report a VSIMM in nibble 4,
-  which does no harm.
 
 ### EMC/SMC Control Regs  Tests
 - Entry: `0x93e0` `post_emc_smc_control_regs_tests`, called from post_main 0x16754 (fail -> Main Logic Board).
@@ -1873,8 +1766,6 @@ failures go to `post_fail_no_dsimm` (0x16d54).
   `emc_write_delay_reg` 0x18780 and restores 0x20 at 0x198a4. VER must be 0 and all RW bits must clear.
 - **Fails with**: 0x95cc: 0x16088 "<<< CPU_%1 on MBus Slot_%2 >>>", 0x129b7 "ERROR : Address = %1, exp = %2, obs =
   %3, xor = %4" (%1 = register offset 0/4/0xc/8/0x18), 0x1294e "U-NUMBER : " + 0x18694 "U0201 (EMC_SMC   ) ", %g3=1.
-- **Core**: absent. ts_decode.vhd has no decode for pa 0xf_0000_0000 (it falls into `sel.vide`: reads 0xBADACCE5,
-  writes are ignored).
 
 ### Slot-0 DSIMM check (no name string)
 - Entry: `0x1274c` `find_first_dsimm`, called from post_main 0x16770 and 0x16820 with %g2 = probe result (%i5) and
@@ -1885,7 +1776,6 @@ failures go to `post_fail_no_dsimm` (0x16d54).
   logical slot 0 holds a DSIMM coded 4 (16 MB) or 6 (64 MB). A code-2 (4 MB) SIMM does not count.
 - **Fails with**: post_main `cmp %o0,0xff` -> `post_fail_no_dsimm` with %i0=1 -> 0x13102 "STATUS : Power-On SelfTest
   FAILED ... SIMM <J0201> Not Installed".
-- **Core**: present (software only). It passes if RAM >= 16 MB so that `dsimm_size_slot(0)` returns 4 or 6.
 
 ### ECC Multiple UE Test
 - Entry: `0x87e0` `post_ecc_multiple_ue_test`, called from post_main 0x16784 (fail -> Main Logic Board).
@@ -1907,7 +1797,6 @@ failures go to `post_fail_no_dsimm` (0x16d54).
   8/0x10/0x14 = which register), "U-NUMBER : " + "U0201 (EMC_SMC   ) ", %g3=1. The code at 0x8fe4/0x9058/0x90dc/
   0x91bc holds unreferenced variants (0x12c37 "No trap taken, expected %1", PIN "P18_U7", "U1002 (SEC_ASIC)" +
   "P136_memctl_irq*", "Suspect Viking Module").
-- **Core**: absent. There is no EMC, and ts_inter.vhd ties the SIPR bit-28 (ECC) source to '0'.
 
 ### ECC Multiple CE Test
 - Entry: `0x8a78` `post_ecc_multiple_ce_test`, called from post_main 0x167a8 (fail -> Main Logic Board).
@@ -1922,7 +1811,6 @@ failures go to `post_fail_no_dsimm` (0x16d54).
   MID<<28|0x0fc0c310 (SIZ=3 doubleword, TYPE=1 read). On other modules the value MID<<28|0x0fffc310 is built but the
   compare is skipped (0x8c54). [0x600014] = 0x503b20+fp (0x8c94). Live EFSR = 0. The corrected load data is not checked.
 - **Fails with**: `ecc_test_fail` 0x8f70 (as above).
-- **Core**: absent (same reason).
 
 ### ECC Multiple CE, UE Test
 - Entry: `0x8cf8` `post_ecc_multiple_ce_ue_test`, called from post_main 0x167bc (fail -> Main Logic Board).
@@ -1935,7 +1823,6 @@ failures go to `post_fail_no_dsimm` (0x16d54).
 - **Expected**: [0x600008] = 0x1a509 (ME | SYND 0xa5 | UE | CE) (0x8e94). [0x600010] = MID<<28|0x0fffc000 (SIZ=0 byte,
   TYPE=0 write; Ross 0x0fc0c000), checked on all modules (0x8ee4). [0x600014] = 0x5034e0+fp (0x8f0c). Live EFSR = 0.
 - **Fails with**: `ecc_test_fail` 0x8f70 (as above).
-- **Core**: absent (same reason).
 
 ### Memory Address Pattern Test
 - Entry: `0x176c0` `post_memory_address_pattern_test` (engine). post_main prints the name (0x16840) and calls it at
@@ -1951,7 +1838,6 @@ failures go to `post_fail_no_dsimm` (0x16d54).
   exp[..] = %2, obs[..] = %3, xor[..] = %4"). Then `simm_print_unumber` prints the DSIMM chip ("U-NUMBER : U0210" ...),
   and %g3 = %i0 = 0xff. post_main clears %i0 and goes to `post_fail_no_dsimm` -> 0x13411 "STATUS : Power-On SelfTest
   FAILED ... Replace/install DSIMM card on <J0201>".
-- **Core**: present (plain RAM through ASI 0x20; needs >= 16 MB).
 
 ### EMC/SMC Memory Timeout Tests
 - Entry: `0xf9a0` `post_emc_smc_memory_timeout_tests`. **Not called (dead code)**: no call and no pointer anywhere.
@@ -1963,7 +1849,6 @@ failures go to `post_fail_no_dsimm` (0x16d54).
 - **Fails with**: L_fec0 (exp/obs + "U0201 (EMC_SMC)" + 0x13803 "ERROR : Suspect MSI Module"); L_ffc8 0x12c37
   "ERROR : No trap taken, expected %1" + "Suspect MSI Module". These are outside this range and shared with the MBus
   to EBus Timeout test.
-- **Core**: absent (guess). The SMP decode maps all pa[35]=0 to RAM, so there is no timeout.
 
 ### Unreferenced MATS engine (no name string; probably the removed "Memory MATS Pattern Tests")
 - Entry: `0x16de0` `mem_mats_dw_engine`, unreached (the listing shows `.word`). It is code: save/ret/restore and
@@ -1971,7 +1856,6 @@ failures go to `post_fail_no_dsimm` (0x16d54).
 - **Algorithm**: args %i0 start, %i1 size, %i2 stride, %i4 mask; ASI 0x20 doubleword. Up: stda 0:0 (0x16e0c). Up:
   ldda, both words &mask == 0, then stda ffffffff:ffffffff (0x16e40..0x16e68). Up: ldda == ones&mask, stda 0:0,
   ldda == 0 (0x16ea4..0x16efc). This is MATS++ with the last element ascending.
-- **Core**: n/a (dead). It would pass on plain RAM.
 
 ### Generic march engine used by the "NTA Pattern" tests (no memory caller)
 - Entry: `0x16f2c` `nta_pattern_engine_asi`, called by 0xe0a0 (IOMMU CAM NTA: 0xe0000100, 0x40, 4, ASI 0x2f,
@@ -1986,7 +1870,6 @@ failures go to `post_fail_no_dsimm` (0x16d54).
   (1=0xffffffff, A=0xaaaaaaaa, 5=0x55555555.)
 - **Fails with**: `mem_test_fail_word` 0x177ec: banner, 0x129b7 Address/exp/obs/xor, optional `simm_print_unumber`
   if %i5 != 0, return o0=0xff. It does not set %g3.
-- **Core**: depends on the ASI under test (owned by the IOMMU/MMU/cache groups).
 
 ### Name strings in 0x14962-0x14bc2 and 0x15822-0x15882
 | String (addr) | Code? |
@@ -2039,7 +1922,7 @@ failures go to `post_fail_no_dsimm` (0x16d54).
   `post_printf`. Pass means %g3 == 0 (the NTA engine returns o0 != 0xff). The NTA engine with its `lda/sta_by_asi`
   helpers is a good generic ASI tester for cache tag/data (ASI 0xc/0xe), TLB diagnostic (ASI 6) and IOMMU (0x2f)
   arrays.
-- **Needs an EMC/SMC model** (absent in the core): Control Regs (reset values: enable IMPL<<28|0x3fc with IMPL=2 for
+- **Needs an EMC/SMC model**: Control Regs (reset values: enable IMPL<<28|0x3fc with IMPL=2 for
   SS20, delay 0x20, VCR 0, EFSR 0, diag 0; RW masks 0x3fc/0xffdf/0xff00/0x4ff) and the three ECC tests. The ECC tests
   also need: diag DMODE=01 check-bit substitution with a real SEC/S4ED code, so that the patterns give the syndromes
   0xd0/0x85/0xa5; UE on partial-write RMW and CE on reads; EFSR/EFAR freeze with ME; MEM_ERR as SIPR bit 28 ->
@@ -2131,7 +2014,6 @@ Soft ON, 0x00 before System Counter, 0x08 before MSI, and 0x00 after the IOMMU t
   exp = %2, obs = %3, xor = %4". The inverted value fails to L_10f80, which prints 0x13b39
   "ERROR : NVRAM (%1) Battery Failure, exp = %2, obs = %3, xor = %4". Both print U1004
   (TOD_NVRAM) and set %g3=1.
-- **Core**: present. ts_rtc.vhd has 8 KB of NVRAM.
 
 ### System Interrupt Regs Tests
 - Entry: `0xd300`, called from post_main `0x16894`. The dead group wrapper 0xd2a0 also calls it.
@@ -2150,9 +2032,6 @@ Soft ON, 0x00 before System Counter, 0x08 before MSI, and 0x00 after the IOMMU t
 - **Fails with**: L_d858. It prints 0x16088 "<<< CPU_%1 on MBus Slot_%2 >>>" (%1 = MID&3,
   %2 = (MID&3)>>1), then 0x129b7 "ERROR : Address = %1, exp = %2, obs = %3, xor = %4", then
   U1002 (SEC_ASIC), and sets %g3=1.
-- **Core**: present, but will fail. ts_inter.vhd stores all 32 mask bits, and reset sets them
-  to 0x7FFFFFFF, which includes the reserved bits 26:23. Nothing in the ROM clears those bits
-  before this test, so the readback is 0xffffffff (xor 0x07800000).
 
 ### PROC0 Interrupt Regs Tests (also "PROC1/PROC2/PROC3 Interrupt Regs Tests")
 - Entry: `0xd3ac`, called from post_main `0x168a8`.
@@ -2177,7 +2056,6 @@ Soft ON, 0x00 before System Counter, 0x08 before MSI, and 0x00 after the IOMMU t
   - Pending must be 0 at the start. With the mask all-clear and the ITR pointing at this CPU,
     no device may be asserting an interrupt (HARD_INT bits).
 - **Fails with**: L_d858, as above (U1002).
-- **Core**: present (ts_inter.vhd, soft bits 31:17 set and clear).
 
 ### Soft Interrupts OFF Test
 - Entry: `0xd594`, called from post_main `0x168bc`.
@@ -2199,7 +2077,6 @@ Soft ON, 0x00 before System Counter, 0x08 before MSI, and 0x00 after the IOMMU t
   - The system pending register must show no device interrupt at all (raw sources,
     independent of the mask).
 - **Fails with**: L_d858 (U1002).
-- **Core**: present.
 
 ### Soft Interrupts ON Test
 - Entry: `0xd710`, called from post_main `0x168e0`.
@@ -2222,7 +2099,6 @@ Soft ON, 0x00 before System Counter, 0x08 before MSI, and 0x00 after the IOMMU t
   - A timeout goes to L_d8cc, which prints 0x12c05 "ERROR : No interrupt received, expected %1"
     (%1 = tt), then U1002, then PIN-NUMBER 0x16120 "P1_m0_irl<3>", 0x16134 "P2_m0_irl<2>",
     0x16148 "P3_m0_irl<1>" and 0x1615c "P4_m0_irl<0>", and sets %g3=1.
-- **Core**: present (softint to IRL encoder in ts_inter.vhd).
 
 ### PROC0 User Timer Test (also "PROC1/PROC2/PROC3 User Timer Test")
 - Entry: `0x10214`, called from post_main `0x168f8` with %o4=0xf1300000 and %o1=1. The dead
@@ -2258,10 +2134,6 @@ Soft ON, 0x00 before System Counter, 0x08 before MSI, and 0x00 after the IOMMU t
   - A register mismatch goes to L_10890 (Address/exp/obs/xor, then U1002).
   - Not counting goes to L_10904, 0x13464 "ERROR : Processor User Timer Not Incrementing" (U1002).
   - An L-bit problem goes to L_10944 (Address/exp/obs/xor, then U1002).
-- **Core**: present (ts_timer.vhd), with three problems:
-  1. Config readback is `dw(3:0) AND CPUEN`, so with 3 CPUs it reads 0x7 instead of 0xf.
-  2. The RUN bit is taken from `dw(I)` rather than `dw(0)`, so PROC1/PROC2 never start.
-  3. Any access to B+0 clears L, even in user-timer mode, so step 9 can fail.
 
 ### PROC0 Counter/Timer Test (also "PROC1/PROC2/PROC3 Counter/Timer Test")
 - Entry: `0x104b0`, called from post_main `0x16910` with %o4=0xf1300000.
@@ -2298,8 +2170,6 @@ Soft ON, 0x00 before System Counter, 0x08 before MSI, and 0x00 after the IOMMU t
   - L_10a38, "No interrupt received, expected 0000001e", plus the P1..P4_m0_irl pins.
   - Handler errors print 0x13500 "Processor Counter Limit Bit".
   - All of these print U1002.
-- **Core**: present. The timing risk: a core with fast PROM fetch finishes the 0x80000 polls in
-  much less than 2.1 s, and step 4 needs at least 500 ns between the two reads.
 
 ### System Counter Test
 - Entry: `0x106fc`, called from post_main `0x16934`.
@@ -2326,7 +2196,6 @@ Soft ON, 0x00 before System Counter, 0x08 before MSI, and 0x00 after the IOMMU t
   - L_10b28, "No interrupt received, expected 0000001a", plus the pins.
   - Handler errors print 0x13554 "System Counter Limit Bit".
   - All of these print U1002.
-- **Core**: present (ts_timer.vhd s_cpt/s_lim).
 
 ### MSI/MSBI Control Reg Tests
 - Entry: `0xe4c0`, called from post_main `0x1695c`.
@@ -2348,8 +2217,6 @@ Soft ON, 0x00 before System Counter, 0x08 before MSI, and 0x00 after the IOMMU t
   - IOMMU control RANGE, DE, ME (bits 4:0).
 - **Fails with**: L_e650 (Address/exp/obs/xor), then U0101 (MSI_ASIC), and sets %g3=1. The
   error path calls functions while %sp holds pattern data (inferred: it would probably crash).
-- **Core**: absent for the slot configuration registers; ts_iommu.vhd returns 0 for
-  0xf_e000_1010..101c, so the test fails on its first compare. Control and base are present.
 - QEMU note (public knowledge): QEMU's IOMMU_SBCFG_MASK 0x00010003 would also fail this test.
 
 ### IOMMU CAM NTA Pattern Test
@@ -2364,13 +2231,12 @@ Soft ON, 0x00 before System Counter, 0x08 before MSI, and 0x00 after the IOMMU t
 - **Expected**: tag bits TAG<30:12> are RW in all 16 entries.
 - **Fails with**: the march helper prints the Address/exp/obs/xor line and returns 0xff. It does
   not set %g3, so POST continues (a non-fatal failure).
-- **Core**: absent (no 0x100 tag diagnostic access).
 
 ### IOMMU TLB NTA Pattern Test
 - Entry: `0xe0c0`, called from post_main `0x16984`. The dead wrapper 0xe03c also calls it.
 - The same march over the TLB (translation cache) data entries 0xf_e000_0200..023c, mask
   0xffffff86 (PPN 31:8, C 7, W 2, V 1), with control = 2 (DE=1), then control = 0.
-- **Fails with**: the same non-fatal print. **Core**: absent (no 0x200 TLB diagnostic access).
+- **Fails with**: the same non-fatal print.
 
 ### IOMMU CAM TLB Comparator Test
 - Entry: `0xe128`, called from post_main `0x16998`.
@@ -2385,7 +2251,6 @@ Soft ON, 0x00 before System Counter, 0x08 before MSI, and 0x00 after the IOMMU t
 - **Expected**: exactly one comparator bit is set, the one for entry 15-k (VA<30:15>
   one-hot). Control is left at 2.
 - **Fails with**: L_e3d0 (Address/exp/obs/xor), then U0101, and sets %g3=1.
-- **Core**: absent (no 0x140/0x150). The core's IMPL is 0, so the test runs and fails.
 
 ### IOMMU TLB Flush Tests
 - Entry: `0xe204`, called from post_main `0x169ac`.
@@ -2409,8 +2274,6 @@ Soft ON, 0x00 before System Counter, 0x08 before MSI, and 0x00 after the IOMMU t
   - A TLB diagnostic read with DE=0 must return V=0 (0 or real data).
   - The IOMMU is left enabled (control = 1).
 - **Fails with**: L_e3d0 or L_e444 (Address/exp/obs/xor), then U0101, and sets %g3=1.
-- **Core**: absent. The core has flush-all, but its address flush also flushes everything, and
-  there is no diagnostic access.
 
 ### TOD Registers Test
 - Entry: `0x10dc0`, called from post_main `0x16b1c`. The dead wrapper 0x10c40 also calls it.
@@ -2438,7 +2301,6 @@ Soft ON, 0x00 before System Counter, 0x08 before MSI, and 0x00 after the IOMMU t
   - L_10ff4, Address/exp/obs/xor (%1 = register address), then U1004.
   - L_110dc, 0x13c36 "ERROR : Memory area used to save TOD regs is bad," then
     Address/exp/obs/xor, with no U-number.
-- **Core**: present. ts_rtc.vhd implements W and R, and the register widths match the masks.
 - **Kickstart**: this ROM has no code for it. The strings 0x13b88 ("TOD Oscillator NOT
   Running, Kickstart in Progress") and 0x13bd7 are unreferenced. 0x13c04 "Unable to Kickstart"
   is used only by the orphan error tail 0x11068. The SS5 ROM is the same. On an MK48T08 a
@@ -2482,7 +2344,6 @@ Soft ON, 0x00 before System Counter, 0x08 before MSI, and 0x00 after the IOMMU t
   - L_ff44, AFSR/AFAR mismatch, then U0101.
   - L_100f0, "No interrupt received", then U0101, P18_mis_int*, U1002, P137_msi_cntrl_irq,
     and "Suspect MSI Module".
-- **Core**: absent (no AFSR/AFAR/arbiter registers).
 
 ### MBus to SBus Timeout Tests (not called: dead code)
 - Entry: `0xfcd8`, with no caller.
@@ -2491,7 +2352,7 @@ Soft ON, 0x00 before System Counter, 0x08 before MSI, and 0x00 after the IOMMU t
      0x836 (EBE bit 11, probably timeout (guess)), and SFAR must be 0x10.
   2. 0xfdf0: byte write to pa 0xe_0000_0e00 must raise a level-15 trap. The AFSR must be
      0xa100020e | MID<<20 (ERR, TO, SIZ=byte, S, SSIZ=byte, PA=0xe), and the AFAR must be 0xe00.
-- Same error exits. **Core**: absent.
+- Same error exits.
 
 ### System timer heartbeat (no name string)
 - `0x193f8` (dead) starts it: system limit = 0x30000000 (about 0.79 s), %g2=8, and
@@ -2556,7 +2417,7 @@ Helpers
   between two reads 3-4 nops apart" checks should poll with a bounded counter.
 - **Needs 64-bit I/O.** The user-timer test uses `ldda`/`stda` to I/O space (a 64-bit bypass
   access that must split into MSW at +0 and LSW at +4).
-- **IOMMU and MSI tests** need only control space, no DVMA. They cannot pass until the core has
+- **IOMMU and MSI tests** need only control space, no DVMA. They need
   tag/TLB diagnostic access, the comparator (0x140/0x150), per-entry address flush, and the
   slot configuration registers.
 - **MBus timeout tests** (dead in the ROM) are worth reviving for async-error validation. They
@@ -2628,8 +2489,6 @@ PPORT Slave test.
 - **Fails with**: 0x7bf4 `dma2_reg_fail`. It prints "<<< CPU_%1 on MBus Slot_%2 >>>" (0x16088)
   and "ERROR : Address = %1, exp = %2, obs = %3, xor" (0x129b7; the Address argument `%l3`
   is stale here) plus U-NUMBER "U0501 (DMA2_ASIC )" (0x18554). Non-fatal.
-- **Core**: absent. `ts_decode` has no select for EF00. Unmapped reads return 0xBADACCE5 with
-  ack (`ts_io` ReadMux).
 
 ### DMA2/MACIO E_CSR Reg. Test
 - Entry: `0x7af0`, from `post_main` 0x169e4 (also from runner 0x71d8).
@@ -2644,8 +2503,6 @@ PPORT Slave test.
   and 0xf_e000_1004.
 - **Fails with**: `dma2_reg_fail` (U0501). AFSR/AFAR mismatches go to 0x7c68
   `dma2_afsr_fail`, which prints "U0101 (MSI_ASIC  )" (0x18540) and U0501. Non-fatal.
-- **Core**: absent. `ts_dmaux` E_CSR has DEV_ID 1010 and RESET, but no bit-6 size error and
-  no error ack. `ts_iommu` does not implement 0x1000/0x1004; they read 0.
 
 ### LANCE Address Port Tests
 - Entry: `0xd9e8`, from `post_main` 0x169f8 (also from runner 0x71ec).
@@ -2660,9 +2517,6 @@ PPORT Slave test.
   - RAP mismatch: 0xdde8 `lance_port_fail` (U0503 "LANCE" 0x18568 + U0501).
   - E_CSR mismatch: 0xde80 `lance_ecsr_fail` (U0501).
   - AFSR/AFAR mismatch: 0xdef4 `lance_afsr_fail` (U0101 + U0501).
-- **Core**: absent. `ts_lance` silently ignores the byte store (RAP is written only when
-  be(3) is set) and the core has no E_CSR bit 6. **With the current core, POST should stop
-  here (0xda94 -> `post_fail_main_logic_board`).**
 
 ### LANCE Data Port Tests
 - Entry: `0xdb0c`, from `post_main` 0x16a0c (also from runner 0x7200).
@@ -2674,7 +2528,6 @@ PPORT Slave test.
     0xa0000040. Clear bit 6.
   - 0xdc24 AFSR must equal `0x9180020e | mid<<20` (SA = 0). AFAR must equal 0xf0c00000.
 - **Fails with**: same exits as the Address Port test. **Fatal.**
-- **Core**: absent. CSR0/CSR1 readback exists in `ts_lance`, but the size-error part does not.
 
 ### DMA2/MACIO D_CSR Reg. Test
 - Entry: `0x7374`, from `post_main` 0x16a20.
@@ -2687,8 +2540,6 @@ PPORT Slave test.
   - 0x742c AFSR must equal `0x9180020e | mid<<20`. 0x7448 AFAR must equal 0xf0400000.
     0x745c clear the AFSR.
 - **Fails with**: `dma2_reg_fail` / `dma2_afsr_fail`. Non-fatal.
-- **Core**: absent. `ts_dmaux` D_CSR reads 0xa0000080 after the RESET write, so part 1
-  passes, but it has no bit 6 and no error ack.
 
 ### DMA2/MACIO D_ADDR Reg. Test
 - Entry: `0x7474`, from `post_main` 0x16a34.
@@ -2702,8 +2553,6 @@ PPORT Slave test.
   - Clear bit 6. AFSR must equal `0x9180420e | mid<<20` (SA = 4). AFAR must equal
     0xf0400004. Clear the AFSR.
 - **Fails with**: `dma2_reg_fail` / `dma2_afsr_fail`. Non-fatal.
-- **Core**: absent. D_ADDR readback exists (`dma_esp_addr_r`); A_LOADED and the size error do
-  not.
 
 ### DMA2/MACIO D_BCNT Reg. Test
 - Entry: `0x7610`, from `post_main` 0x16a58. It does not `clr %g3` (harmless).
@@ -2714,7 +2563,6 @@ PPORT Slave test.
   - Clear bit 6. AFSR must equal `0x9180820e | mid<<20` (SA = 8). AFAR must equal
     0xf0400008. Clear the AFSR.
 - **Fails with**: `dma2_reg_fail` / `dma2_afsr_fail`. Non-fatal.
-- **Core**: absent. Offset 0x08 is only a comment in `ts_dmaux` and reads 0.
 
 ### DMA2/MACIO D_NADDR Reg. Test
 - Entry: `0x7750`, from `post_main` 0x16a6c.
@@ -2725,7 +2573,6 @@ PPORT Slave test.
   - Repeat the reset. 0x77dc `stba 0x55` to +4. D_CSR `& ~0xc` must be 0xa1002040.
   - Clear bit 6. AFSR must equal `0x9180420e | mid<<20`. AFAR must equal 0xf0400004.
 - **Fails with**: `dma2_reg_fail` / `dma2_afsr_fail`. Non-fatal.
-- **Core**: absent. There is no EN_NEXT/NADDR; the plain D_ADDR readback would pass.
 
 ### ESP Registers Tests
 - Entry: `0x9640`, from `post_main` 0x16a80.
@@ -2741,8 +2588,6 @@ PPORT Slave test.
 - **Touches**: pa 0xe_f080_0000 +0x00/+0x04/+0x08/+0x0c/+0x20 (8-bit), and D_CSR.
 - **Fails with**: 0x98d0 `esp_reg_fail`. It prints ERROR Address/exp/obs/xor, "U0504
   (ESP_SCSI  )" (0x1857c) and U0501, then `%g3 = 1` (**fatal**).
-- **Core**: present. `ts_esp` implements CFG1 read/write, a 16-byte FIFO, CMD readback, and
-  loads the transfer counter from the start count on a DMA command.
 
 ### DMA2/MACIO P_CSR Reg. Test
 - Entry: `0x7d00`, from `post_main` 0x16a94.
@@ -2752,20 +2597,18 @@ PPORT Slave test.
     must all be 0.
 - **Touches**: pa 0xe_f480_0000 (32-bit).
 - **Fails with**: 0x8408 `pport_reg_fail` (ERROR + U0501). Non-fatal.
-- **Core**: absent. There is no BPP decode at EF48. It reads 0xBADACCE5, whose bit 0 = 1, so
-  the test fails.
 
 ### DMA2/MACIO P_ADDR Reg. Test
 - Entry: `0x7db8`, from `post_main` 0x16aa8.
 - **Algorithm**: P reset pulse and a dummy read. Then 0x7e20-0x7e54 write P_ADDR (+4) with
   0xa55a5aa5, 0xffffffff, 0; each must read back unchanged (full 32 bits).
-- **Fails with**: `pport_reg_fail`. Non-fatal. **Core**: absent (no BPP).
+- **Fails with**: `pport_reg_fail`. Non-fatal.
 
 ### DMA2/MACIO P_BCNT Reg. Test
 - Entry: `0x7e78`, from `post_main` 0x16abc.
 - **Algorithm**: P reset pulse. Then write P_BCNT (+8) with 0xa55a5aa5, 0xffffffff, 0. The
   reads must return 0x005a5aa5, 0x00ffffff, 0: the counter is 24 bits and bits 31:24 read 0.
-- **Fails with**: `pport_reg_fail`. Non-fatal. **Core**: absent (no BPP).
+- **Fails with**: `pport_reg_fail`. Non-fatal.
 
 ### PPORT Registers Tests
 - Entry: `0x7f48`, from `post_main` 0x16ad0.
@@ -2777,7 +2620,7 @@ PPORT Slave test.
   - 0x8008 OR (+0x16) must be 0.
   - 0x8024 ICR (+0x18) = 0xfc00. The IRQ status bits are write-1-to-clear, so the read must
     be 0.
-- **Fails with**: `pport_reg_fail`. Non-fatal. **Core**: absent (no BPP).
+- **Fails with**: `pport_reg_fail`. Non-fatal.
 
 ### DMA2/MACIO PPORT IO Lpbck Tst
 - Entry: `0x82f0`, from `post_main` 0x16ae4.
@@ -2786,7 +2629,6 @@ PPORT Slave test.
   PE/SLCT/ERR. Afterwards 0x8368 OR = 0; OCR is left with EN_DIAG set.
 - **Fails with**: `pport_reg_fail`. The pin-list exit 0x847c (P94_p_pe*, P95_p_slct_in,
   P96_p_slct, P123_p_afxn, P125_p_error, P126_p_init) is never branched to.
-- **Core**: absent.
 
 ### DMA2/MACIO PPORT XFR Lbck Tst
 - Entry: `0x8380`, from `post_main` 0x16af8 (the last test of the group).
@@ -2795,7 +2637,6 @@ PPORT Slave test.
 - **Fails with**: 0x85c8 `pport_xfr_lpbk_fail`. It prints ERROR, U0501 and PIN-NUMBER
   "P84_p_d_strb*", "P108_p_bsy*", "P110_p_ack*" (pin table 0x1624c + 0x3c / 0xa0 / 0xb4).
   Non-fatal.
-- **Core**: absent.
 
 ### DMA2/MACIO D_NBCNT Reg. Test
 - Entry: `0x7874`. Reached only from runner 0x721c, which has no caller: **dead**.
@@ -2806,7 +2647,7 @@ PPORT Slave test.
     address written under EN_NEXT is loaded as the current address (A_LOADED).
   - Repeat the reset. 0x7934 `stba` to +8. D_CSR must be 0xa1002040. Clear bit 6.
   - AFSR must equal `0x9180820e | %i5`. AFAR must equal 0xf0400008.
-- **Fails with**: the DMA2 exits (non-fatal). **Core**: absent.
+- **Fails with**: the DMA2 exits (non-fatal).
 
 ### DMA2/MACIO D_NA_LOADED Test
 - Entry: `0x79c0`, via runner 0x721c only: **dead**.
@@ -2818,7 +2659,7 @@ PPORT Slave test.
     be 0xad002000 (A_LOADED and NA_LOADED).
   - 0x7abc D_CSR = 0x01002020 (FLUSH). The CSR must read back 0xa1002000: FLUSH clears both
     LOADED bits and reads as 0.
-- **Fails with**: `dma2_reg_fail` (non-fatal). **Core**: absent.
+- **Fails with**: `dma2_reg_fail` (non-fatal).
 
 ### DMA2/MACIO PPORT Slave Tests
 - Entry: `0x8050`. **No caller (dead)**.
@@ -2845,8 +2686,6 @@ PPORT Slave test.
     U0501, "P137_sb_p_irq".
   - 0x872c `pport_slave_afsr_fail`: U0101 + U0501.
   - The second bit-6 check goes to 0x119e4 (print, then `jmp %g1` retry).
-- **Core**: absent. There is no BPP, and the `ts_inter` M-to-S level-15 source (bit 29) is
-  tied to 0.
 
 ### Ethernet Loopback Test
 - Entry: `0xdc6c`. **No caller (dead)**. Despite the name, it is a register-dump stub with no
@@ -2859,8 +2698,7 @@ PPORT Slave test.
   - 0xddc4 loop stores 0xa5a5a5a5 to pa 0x40, 0x3c, ... through ASI 0x20. The loop uses
     `sub` without setting cc, so `bne,a` tests stale condition codes. Depending on those
     flags it runs once or never ends.
-- **Fails with**: nothing (it always returns `%g3 = 0`). **Core**: unknown. E test CSR and
-  cache-valid are commented "Inutile" in `ts_dmaux` and read 0.
+- **Fails with**: nothing (it always returns `%g3 = 0`).
 
 ### LANCE Internal Loopback Tests / LANCE External Loopback Tests
 - Entry: `0x1df50` (compiled C). **No caller (dead)**, like the other C extended tests.
@@ -2906,8 +2744,6 @@ PPORT Slave test.
   "<<<*** CHECK ETHERNET EXTERNAL LOOPBACK CONNECTOR ***>>>" (external only; the receive path
   also calls `sub_1ba6c`, which sets `%g3 = 1`), "Error in receive buffer: asi %1 addr %2,
   exp %3, obs %4".
-- **Core**: unknown. `ts_lance` declares LOOP (`lopo`) but never uses it, so there is no loopback (corrected by [impl-gaps/chipset.md](../../legacy/impl-gaps/chipset.md) LAN-1), and `ts_iommu` exists, but the arbiter
-  register (0x1008) is not implemented.
 
 #### Name strings with no code ("name string only")
 No code reference was found, either in the listing or by a raw sethi/or scan of the ROM:
@@ -2957,7 +2793,7 @@ The strings with code are the 17 at 0x14be2-0x14dc2 plus 0x14f62, 0x14f82 and 0x
   `%i0 = 0xff` (DMA2, PPORT). For a suite, have every exit set a result word, because
   `%g3` is not set for DMA2/PPORT.
 - **Needed for the size-error half of each DMA2/LANCE test** (non-fatal DMA2 checks, but the
-  fatal LANCE port tests), all absent in the core:
+  fatal LANCE port tests):
   - the SBus slave size error (byte access to DMA2/LANCE registers is dropped, sets CSR bit 6,
     and is error-acked);
   - M-to-S AFSR/AFAR with the exact fields: MID of the requesting CPU, S, SIZ/SSIZ = byte,
@@ -2976,12 +2812,12 @@ The strings with code are the 17 at 0x14be2-0x14dc2 plus 0x14f62, 0x14f82 and 0x
     0xff000000, the E_BASE high byte, LANCE INTL/LOOP, and descriptor OWN handshakes.
   - Its arbiter write disables the other CPUs' MBus arbitration: run it only on a
     single-CPU build or restore 0xfe0001008 afterwards.
-- Quick wins for the core:
+- Quick wins:
   - MACIO ID register at 0xef0000000 (0xfe810103, write-ignore);
-  - D_BCNT, A_LOADED / NA_LOADED, EN_NEXT and bit 6 in `ts_dmaux`;
-  - AFSR/AFAR in `ts_iommu`;
-  - a BPP register stub at 0xef4800000 with the reset values above. Currently an unmapped
-    read returns 0xBADACCE5 with ack, so every PPORT test prints an error.
+  - D_BCNT, A_LOADED / NA_LOADED, EN_NEXT and bit 6 in the DMA2 registers;
+  - AFSR/AFAR in the M-to-S bridge;
+  - a BPP register stub at 0xef4800000 with the reset values above; without it every
+    PPORT test prints an error.
 
 ## 10. HyperSPARC (one line each)
 
@@ -2990,9 +2826,7 @@ Run only when `get_module_type` returns 0x17 (MCNTL[31:24] = 0x17): `post_main`
 SuperSPARC MMU/cache block and continues at the EMC test. The runner stops at the
 first test returning `%o0 != 0` and sets `%g3`. Test names are printed from the
 55-byte slot table at 0x223f8 (`hs_print_test_name` 0x21740) when NVRAM 0x1ff2
-!= 0; the two E-cache tests also need 0x1ff2 != 0. **Core: absent** for all of
-them (no HyperSPARC personality; ASI 0x17/0x1f are no-ops in `mcu_simple.vhd`,
-no ICCR).
+!= 0; the two E-cache tests also need 0x1ff2 != 0.
 
 | Slot | Test (ROM name) | Entry | What it does |
 |---|---|---|---|
@@ -3038,7 +2872,7 @@ address wraps at the cache size), 0x10-0x14 combined flushes, 0x17 block copy,
 
 ## 11. Candidate CPU test suite
 
-For [`tests/cpu/`](../../../tests/cpu/README.md) (REWORK.md step 1f), which
+For [`tests/cpu/`](../../../tests/cpu/README.md), which
 already boots as the PROM on the `ss20` target (boot mode, image copied to pa
 0, ttya 9600 8N1 — the same set-up `post_zs_init_serial` uses) and holds the
 generic V8 tests. The POST gives expectations for the SuperSPARC-specific
@@ -3050,23 +2884,23 @@ Each needs the POST trap protocol (a trap table whose handlers compare tt with
 `%g5`, clear it and skip or retry — README §7), which a suite should implement
 once in its stub. "Serial" = only the ttya port for reporting.
 
-| Test (section) | Needs | Pass/fail | Core |
-|---|---|---|---|
-| IU globals, IU windows (§2) | nothing (no RAM) | branch to a fail stub | present |
-| FPU Register File, Misaligned Reg Pair, SP / DP arithmetic (§5) | RAM scratch (pa 0x600000 in POST), PSR.EF | compare, `%g3` | present (unknown for exact results) |
-| FPU SP/DP Invalid, Overflow, Underflow, Divide-by-0, Inexact CEXC (§5) | RAM, tt 8 handler that drains the FQ (`std %fq` while FSR.qne) | `%g5` cleared + cexc bit + blocked store | unknown |
-| FPU SP/DP Trap Priority > / < (§5) | RAM, tt 7 and tt 8 handlers | trap order | **absent**: `iu_pipe5.vhd` ranks fp_exception above mem_address_not_aligned (static reading of lines 892-900, not simulated); POST expects tt 7 first |
-| MMU Context Table Reg / Context Register (§4) | ASI 4 only | walking one | Context Register **fails**: the core keeps 8 context bits, POST expects 12 (0xfff) |
-| MMU TLB Bit Pattern, MMU Flush Tests (§4) | ASI 6 diag (entry << 12 \| SEL << 8), ASI 3 flush, pattern tables | read-back compare | absent (TLB diag ignored in `mcu_multi.vhd`) |
-| D-/I-Cache RAM, PTAG, STAG, I-Cache Flush, Cache Flashclear (§3) | ASI 0x0c-0x0f diag, ASI 0x36/0x37 flash clear | read-back compare | absent |
-| Soft Interrupts OFF / ON, PROCn Interrupt Regs, System Interrupt Regs (§8) | interrupt controller pa `0xf_f140_0000/0xf_f141_0000`, level handlers | `%g5`, register compare | partly (System Interrupt Regs expected to fail: mask reset/readback) |
-| PROCn User Timer, Counter/Timer, System Counter (§8) | counters pa `0xf_f130_n000`, `0xf_f131_0000`, 64-bit `ldda/stda` to I/O | increments, limit bit, level 14/10 interrupt | partly (config readback, run bit, limit-bit clear on read differ, see §8) |
-| TOD Registers (§8) | MK48T08 at `0xf_f120_1ff8..`, 8 bytes RAM | read-back | unknown |
-| MSI/MSBI Control, IOMMU CAM/TLB NTA, Comparator, TLB Flush (§8) | pa `0xf_e000_0000-0x1fff` | read-back | absent (slot config, diag windows, comparator, per-address flush) |
-| DMA2/ESP/LANCE/PPORT register tests (§9) | SBus pa `0xe_f040_0000..0xe_f480_0000`; M-to-S AFSR/AFAR for the byte-size-error half | read-back, AFSR value | ESP present; the rest largely absent |
-| Memory Address Pattern, MATS/NTA engines (§7) | ≥ 16 MB RAM via ASI 0x20 | compare | present |
-| EMC/SMC Control Regs, ECC Multiple UE/CE (§7) | EMC at pa `0xf_0000_0000`, ECC generation/check, level-15 | register values, EFSR/EFAR | **absent** (EMC not decoded; POST stops here with "Replace Main Logic Board") |
-| MXCC suite (§6) | ASI 2 MXCC, E-cache | compare, stream completion | absent (core reports MCNTL.MB = 1, the suite is skipped) |
+| Test (section) | Needs | Pass/fail |
+|---|---|---|
+| IU globals, IU windows (§2) | nothing (no RAM) | branch to a fail stub |
+| FPU Register File, Misaligned Reg Pair, SP / DP arithmetic (§5) | RAM scratch (pa 0x600000 in POST), PSR.EF | compare, `%g3` |
+| FPU SP/DP Invalid, Overflow, Underflow, Divide-by-0, Inexact CEXC (§5) | RAM, tt 8 handler that drains the FQ (`std %fq` while FSR.qne) | `%g5` cleared + cexc bit + blocked store |
+| FPU SP/DP Trap Priority > / < (§5) | RAM, tt 7 and tt 8 handlers | trap order |
+| MMU Context Table Reg / Context Register (§4) | ASI 4 only | walking one |
+| MMU TLB Bit Pattern, MMU Flush Tests (§4) | ASI 6 diag (entry << 12 \| SEL << 8), ASI 3 flush, pattern tables | read-back compare |
+| D-/I-Cache RAM, PTAG, STAG, I-Cache Flush, Cache Flashclear (§3) | ASI 0x0c-0x0f diag, ASI 0x36/0x37 flash clear | read-back compare |
+| Soft Interrupts OFF / ON, PROCn Interrupt Regs, System Interrupt Regs (§8) | interrupt controller pa `0xf_f140_0000/0xf_f141_0000`, level handlers | `%g5`, register compare |
+| PROCn User Timer, Counter/Timer, System Counter (§8) | counters pa `0xf_f130_n000`, `0xf_f131_0000`, 64-bit `ldda/stda` to I/O | increments, limit bit, level 14/10 interrupt |
+| TOD Registers (§8) | MK48T08 at `0xf_f120_1ff8..`, 8 bytes RAM | read-back |
+| MSI/MSBI Control, IOMMU CAM/TLB NTA, Comparator, TLB Flush (§8) | pa `0xf_e000_0000-0x1fff` | read-back |
+| DMA2/ESP/LANCE/PPORT register tests (§9) | SBus pa `0xe_f040_0000..0xe_f480_0000`; M-to-S AFSR/AFAR for the byte-size-error half | read-back, AFSR value |
+| Memory Address Pattern, MATS/NTA engines (§7) | ≥ 16 MB RAM via ASI 0x20 | compare |
+| EMC/SMC Control Regs, ECC Multiple UE/CE (§7) | EMC at pa `0xf_0000_0000`, ECC generation/check, level-15 | register values, EFSR/EFAR |
+| MXCC suite (§6) | ASI 2 MXCC, E-cache | compare, stream completion |
 
 Changes worth making when lifting (from the group sections): preload FP
 destinations with non-zero data and use `fbne` in the misaligned-pair test;
@@ -3075,19 +2909,17 @@ pattern; replace the POST's poll-count delays (tuned for ~0.7 µs per uncached
 PROM instruction) by counter-based time-outs; add a time-out to the MXCC stream
 polls (the POST loops forever on a stuck stream).
 
-### 11.2 MP and coherency tests for the 3-CPU MESI core
+### 11.2 MP and coherency tests
 
 What POST itself exercises across CPUs is limited:
 
 - the start/stop protocol (arbiter enable register + NVRAM mailboxes,
   README §5) — every other MP feature depends on it;
 - each CPU identifying itself (`get_mid`: MXCC port register, MSI MID
-  register, or ASI 0x38 va 0) — **on the current core all CPUs identify as
-  MID 8**: the core reports IOMMU IMPL 0 and MCNTL.MB = 1, its MSI MID register
-  (pa `0xf_e000_2000`) and arbiter enable (`0xf_e000_1008`) are not decoded by
-  `ts_iommu.vhd` (they read 0), and ASI 0x38 is the core's internal table-walk
-  ASI rather than a SuperSPARC scratch register, so the reset path and POST
-  would run the master path on every CPU;
+  register, or ASI 0x38 va 0) — with IOMMU IMPL 0 and MCNTL.MB = 1, if the
+  MSI MID register (pa `0xf_e000_2000`) reads 0 and ASI 0x38 va 0 does not
+  hold its value, **all CPUs identify as MID 8** and the reset path and POST
+  run the master path on every CPU;
 - per-CPU registers exercised by their owner: each slave runs `post_main`
   itself, so PROCn interrupt/timer tests use its own `0xf_f140_n000` /
   `0xf_f130_n000` (n = MID & 3), and `mp_run_with_target` points the interrupt
@@ -3123,21 +2955,7 @@ the same mailbox idea but with the suite's own RAM mailboxes:
    another CPU holds modified (needs IOMMU and DMA2; the POST's LANCE loopback
    is dead code but gives the descriptor layout).
 
-### 11.3 Where the current core would stop
-
-From the group sections' quick RTL greps (not simulated), in POST order for the
-core's identity (type 0x40, no MXCC):
-
-1. Reset / POST start: every CPU believes it is MID 8 (see §11.2), so with
-   more than one CPU the MP protocol breaks down before the first test.
-2. `post_main` #5, **MMU Context Register Test**: 8 context bits instead of
-   12 → "Replace MBUS0 Module".
-3. Behind it (each would stop POST in turn): TLB Bit Pattern and MMU Flush (TLB
-   diag), D/I-cache diag and flash clear, EMC/SMC Control Regs (EMC absent),
-   ECC tests, FPU SP Trap Priority < (trap priority), FPU DP CE Trap Priority
-   (no ECC correction), System Interrupt Regs (mask register), User Timer
-   (config/run bit), MSI/MSBI Control Regs (slot config), IOMMU Comparator /
-   TLB Flush, LANCE Address/Data Port (M-to-S size-error protocol).
+### 11.3 First failure under QEMU
 
 Under QEMU (SuperSPARC-II identity) the first failure is "MMU ICACHE_TLB bit
 pattern Test", Case 0xf (ASI 5 I-TLB diag not modelled).

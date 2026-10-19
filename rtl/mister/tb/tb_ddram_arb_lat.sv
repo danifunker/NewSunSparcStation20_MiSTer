@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
 // Throughput: master 0 streams 4-beat reads into a fixed-latency slave.
 // Prints cycles per burst; run with -P tb.L=<latency>.
 `timescale 1ns/1ps

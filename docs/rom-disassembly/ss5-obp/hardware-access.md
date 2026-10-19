@@ -4,7 +4,7 @@ Every physical address and alternate space (ASI) that the **machine code** of
 `ss5.bin` touches: the POST, the reset paths, the boot-time serial code, the
 page-table builder and `obp_cold_entry` (PROM `0x70000000`-`0x7000f6ff` and
 `0x7002a86c`-`0x7002ab4f`). The Forth kernel's own accesses are not included.
-This is the input for the phase 2 diff against the core's address decoder.
+This is the input for a diff against a core's address decoder.
 
 How it was made: `romdis.py` tracks `sethi`/`or`/`add` constants, so most
 effective addresses are known statically; the device tables below are generated
@@ -227,33 +227,30 @@ code:
 
 ## 5. Address ranges for the decoder diff
 
-Physical ranges the machine code reaches, with the registers used, and — from
-a quick read of the SS5 branch of `rtl/sun4m/ts_decode.vhd` (lines 54-98) —
-whether the core has an address select for them ("decoded" says nothing about
-how complete the device is; see [`post-tests.md`](post-tests.md) for that):
+Physical ranges the machine code reaches, with the registers used:
 
-| Range | Device | Registers used | Core decode |
-|---|---|---|---|
-| `0x00000000`-`0x0fffffff` | RAM, 8 banks × 32 MB | sizing probes, march tests, scratch, page tables | `sel.ram` (PA[31:28]=0) |
-| `0x10000000`-`0x10000fff` | IOMMU | +0 control, +4 base, +0x14 flush all, +0x18 address flush | `sel.iommu` (PA[31:28]=1) |
-| `0x10001000`-`0x10001fff` | SBus controller | +0 AFSR, +4 AFAR, +0x10 SSCR0 (SSCR1-4 listed, not reached), +0x50 MFSR, +0x54 MFAR | inside `sel.iommu` |
-| `0x10002000` | MID / SBAE | +0 | inside `sel.iommu` |
-| `0x70000000`-`0x7003ffff` | **boot PROM** | instruction fetch in boot mode; ASI 9 loads (`post_printf`, tables; boot-mode mapped like fetches); **ASI 0x20 loads** at `0x7000xxxx` (`boot_puts`); and, once the MMU is on, every PTE OBP builds for the PROM (`mmu_map_range(0x70000000, …)`, watchdog TLB entries → PA `0x7000c000`, `0x70027000`) | **not decoded**: the core's PROM is at PA `0xFxxxxxxx`/`0xBxxxxxxx` (`sel.rom`), and its boot-mode fetch produces PA `0xFF`+VA[27:0] (`rtl/cpu/mcu_simple.vhd:1393`) instead of `0x7`+VA[27:0]. Boot-mode fetches would still reach the PROM; the ASI 0x20 reads and the translated PROM mapping would not |
-| `0x71000000` | Z85C30 #0 (keyboard ch A) | +4 control, +6 data | `sel.kbm` |
-| `0x71100000` | Z85C30 #1 (ttya ch A) | +4 control, +6 data | `sel.sport` |
-| `0x71200000`-`0x71201fff` | MK48T08 NVRAM/TOD | +0, +1, +3, +0x4e, +0x1dd8, +0x1ff8-+0x1fff | `sel.rtc` |
-| `0x71400300` | EBus, floppy range (no device at +0x300) | read to force an error acknowledge | not decoded (falls to `sel.vide`) |
-| `0x71d00000`-`0x71d0000f` | processor 0 counter / user timer | +0, +4, +8, +0xc | `sel.timer` |
-| `0x71d10000`-`0x71d10013` | system counter, timer configuration | +0, +4, +0x10 | `sel.timer` |
-| `0x71e00000`-`0x71e0000b` | processor 0 interrupts | +0 pending, +4 clear, +8 set-soft | `sel.inter` |
-| `0x71e10000`-`0x71e1000f` | system interrupts | +0 pending, +8 mask clear, +0xc mask set | `sel.inter` |
-| `0x71f00000` | system control/status | +0 | `sel.syscon` |
-| `0x78000000`-`0x78000003` | slot-5 ID register | word, halves, bytes (uncalled test) | not decoded |
-| `0x78400000`-`0x78400013` | DMA2 ESP and Ethernet channels | +0 D_CSR, +4 D_ADDR, +8 D_BCNT, +0x10 E_CSR | `sel.dma2` |
-| `0x78800000`-`0x78800023` | ESP 53C9x | +0, +4, +8, +0xc, +0x20 | `sel.esp` |
-| `0x78c00000`-`0x78c00003` | LANCE | +0 RDP, +2 RAP | `sel.lance` |
-| `0x7c800000`-`0x7c800019` | DMA2 parallel channel + BPP | +0 P_CSR, +4 P_ADDR, +8 P_BCNT, +0x10..+0x18 BPP | not decoded |
-| `0x7cc00000` | slot-5 hole | read to force an SBus time-out | not decoded (the core acknowledges instead of timing out) |
+| Range | Device | Registers used |
+|---|---|---|
+| `0x00000000`-`0x0fffffff` | RAM, 8 banks × 32 MB | sizing probes, march tests, scratch, page tables |
+| `0x10000000`-`0x10000fff` | IOMMU | +0 control, +4 base, +0x14 flush all, +0x18 address flush |
+| `0x10001000`-`0x10001fff` | SBus controller | +0 AFSR, +4 AFAR, +0x10 SSCR0 (SSCR1-4 listed, not reached), +0x50 MFSR, +0x54 MFAR |
+| `0x10002000` | MID / SBAE | +0 |
+| `0x70000000`-`0x7003ffff` | **boot PROM** | instruction fetch in boot mode; ASI 9 loads (`post_printf`, tables; boot-mode mapped like fetches); **ASI 0x20 loads** at `0x7000xxxx` (`boot_puts`); and, once the MMU is on, every PTE OBP builds for the PROM (`mmu_map_range(0x70000000, …)`, watchdog TLB entries → PA `0x7000c000`, `0x70027000`) |
+| `0x71000000` | Z85C30 #0 (keyboard ch A) | +4 control, +6 data |
+| `0x71100000` | Z85C30 #1 (ttya ch A) | +4 control, +6 data |
+| `0x71200000`-`0x71201fff` | MK48T08 NVRAM/TOD | +0, +1, +3, +0x4e, +0x1dd8, +0x1ff8-+0x1fff |
+| `0x71400300` | EBus, floppy range (no device at +0x300) | read to force an error acknowledge |
+| `0x71d00000`-`0x71d0000f` | processor 0 counter / user timer | +0, +4, +8, +0xc |
+| `0x71d10000`-`0x71d10013` | system counter, timer configuration | +0, +4, +0x10 |
+| `0x71e00000`-`0x71e0000b` | processor 0 interrupts | +0 pending, +4 clear, +8 set-soft |
+| `0x71e10000`-`0x71e1000f` | system interrupts | +0 pending, +8 mask clear, +0xc mask set |
+| `0x71f00000` | system control/status | +0 |
+| `0x78000000`-`0x78000003` | slot-5 ID register | word, halves, bytes (uncalled test) |
+| `0x78400000`-`0x78400013` | DMA2 ESP and Ethernet channels | +0 D_CSR, +4 D_ADDR, +8 D_BCNT, +0x10 E_CSR |
+| `0x78800000`-`0x78800023` | ESP 53C9x | +0, +4, +8, +0xc, +0x20 |
+| `0x78c00000`-`0x78c00003` | LANCE | +0 RDP, +2 RAP |
+| `0x7c800000`-`0x7c800019` | DMA2 parallel channel + BPP | +0 P_CSR, +4 P_ADDR, +8 P_BCNT, +0x10..+0x18 BPP |
+| `0x7cc00000` | slot-5 hole | read to force an SBus time-out |
 
 Not touched by the machine code at all: TCX and the other SBus slots, the
 CS4231/APC audio block, the floppy controller proper, the AUX registers

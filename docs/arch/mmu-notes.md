@@ -23,7 +23,6 @@ the MMU design needs.
 | **OBP** | OBP 2.25 disassembly notes | `docs/rom-disassembly/ss20-obp-2.25/<file>.md:line` |
 | **tests** | the project's CPU suite | `tests/cpu/…:line` |
 | **PLAN** | `docs/VERILOG-PLAN.md` | § and line |
-| **gaps** | `docs/legacy/impl-gaps/cpu.md` | IDs and line numbers. Its old-core file names are history; only its hardware facts are used here |
 
 **Which chip.** The 1990 Viking manual describes the TMS390Z50 that the SS20
 calls "SuperSPARC" (OBP prints "TMS390Z50(3.x)", iu-notes §6.1). Where the
@@ -489,11 +488,11 @@ other source says about them.
   | 0x0200 | context | all |
   | 0x0300 | MFSR, read clears | all |
   | 0x0400 | MFAR | all |
-  | 0x0500 | — (not listed → data_access_exception) | Sun-4M generic AFSR (§2.3); "Viking has no AFSR/AFAR" (`Sun4M…txt:5126-5130`). NetBSD AFSR "HS only" (`include/ctlreg.h:241-250`); `docs/arch/cpu.md:227-237` and `memory-map.md:53-65` list AFSR 0x500 for this core; the SS5 test `t_mmu_swift` expects 0x500/0x600 to read 0 on microSPARC-II (gaps MMU-1, lines 282-288). The OBP map lists 0x500/0x600 as AFSR/AFAR (`hardware-access.md:263-266`) |
+  | 0x0500 | — (not listed → data_access_exception) | Sun-4M generic AFSR (§2.3); "Viking has no AFSR/AFAR" (`Sun4M…txt:5126-5130`). NetBSD AFSR "HS only" (`include/ctlreg.h:241-250`); `docs/arch/cpu.md:227-237` and `memory-map.md:53-65` list AFSR 0x500 for this core; the SS5 test `t_mmu_swift` expects 0x500/0x600 to read 0 on microSPARC-II (MMU-1). The OBP map lists 0x500/0x600 as AFSR/AFAR (`hardware-access.md:263-266`) |
   | 0x0600 | — | Sun-4M generic AFAR; NetBSD AFAR "HS only" / PCFG (Turbo); the core plan's AFAR |
   | 0x0700 | — | Sun-4M generic reset register (WD bit 2, SI bit 1); "There is no Reset Register internal to Viking. The Watchdog Reset status is found in SFSR bit <17>" (`Sun4M…txt:1046-1059`, `:5132-5137`). OBP 2.25 reads 0x700 bit 2 only on Ross modules (MCNTL IMPL = 1) (`listing.s:39136-39150`, `hardware-access.md:263-266`). NetBSD `SRMMU_RST` 0x700, SI 0x2, WD 0x4 (`include/ctlreg.h:428-429`); the core plan's "reset 0x700" (`docs/arch/cpu.md:227-237`). §5 |
   | 0x0800 and up | — | Sun-4M: "implementation dependent" (`Sun4M…txt:547-557`) |
-  | 0x1000 | — | NetBSD `SRMMU_TLBCTRL` 0x1000 (TLBC_DISABLE 0x20, RCNTMASK 0x1f) (`include/ctlreg.h:241-250`, `:424-425`); QEMU stores it as `mmuregs[0x10]` with `mmu_trcr_mask` (0xffffffff for TI SuperSparc) (`ldst_helper.c:1027-1029`, `cpu.c:479-490`); microSPARC-II TRCR (gaps MMU-1 lines 282-288). **The SS5 OBP** (microSPARC-II) writes 0 to it every boot (gaps line 38, `tlb_init_clear` at 0x7000be70). OBP 2.25 touches ASI 4 0x1000-0x1200 only on its Ross/HyperSPARC paths (`listing.s:6609-6634`; `hardware-access.md:263-266`: "0x1000-0x1700 HyperSPARC / emulation registers"); no SS20 Viking path writes it |
+  | 0x1000 | — | NetBSD `SRMMU_TLBCTRL` 0x1000 (TLBC_DISABLE 0x20, RCNTMASK 0x1f) (`include/ctlreg.h:241-250`, `:424-425`); QEMU stores it as `mmuregs[0x10]` with `mmu_trcr_mask` (0xffffffff for TI SuperSparc) (`ldst_helper.c:1027-1029`, `cpu.c:479-490`); microSPARC-II TRCR (MMU-1). **The SS5 OBP** (microSPARC-II) writes 0 to it every boot (`tlb_init_clear` at 0x7000be70). OBP 2.25 touches ASI 4 0x1000-0x1200 only on its Ross/HyperSPARC paths (`listing.s:6609-6634`; `hardware-access.md:263-266`: "0x1000-0x1700 HyperSPARC / emulation registers"); no SS20 Viking path writes it |
   | 0x1300 | read/write MFSR (Viking: "to allow read/write access to the MFSR") | QEMU: read returns the SFSR **without clearing**, write sets it (`ldst_helper.c:674-689`, `:1030-1033`) |
   | 0x1400 | read/write MFAR | QEMU `ldst_helper.c:1034-1036` |
   | 0x1500 | shadow MFSR (emulation mode) | SuperSPARC II: no MSFSR, data_access_exception (SS-II `STP1021UG.txt:1330-1340`) |
@@ -502,9 +501,9 @@ other source says about them.
   dropped (0x2000 aliases 0) and every index is a plain storage register
   except 3, 0x13, 0x14 (`ldst_helper.c:674-689`). It never raises an
   exception for a bad VA or size on ASI 4.
-- **Old-core private registers** in the reserved space: 0xB00 (SFSR
+- **Project-private registers** in the reserved space: 0xB00 (SFSR
   without clear), 0xC00 (scratch), 0xD00 (SYSCONF: RAM size in MB in bits
-  31:20, CPU count) (gaps lines 294-296). The suite still reads 0xB00
+  31:20, CPU count). The suite still reads 0xB00
   (`wdtest.S`) and 0xD00 (`t_cache_diag.S:93-95` skip rule; `t_msi.S:98-107`
   `t_mem_slot7`). On a Viking these VAs are not in Table 4-9 →
   data_access_exception with CS.
@@ -517,7 +516,7 @@ need:
 
 | Bit | Name | Value / behaviour | Sources |
 |---|---|---|---|
-| 31:24 | IMPL/VER | 0x01 on SuperSPARC 3.x (IMPL 0, VER 1); 4.x VER 2, 5.x VER 3; SS-II VER 8/0xA. Viking 1990 says 0 | SS-II Table A-51; QEMU `cpu.c:479-490` (`mmu_version 0x01000800`); NetBSD `cpu.c:2025-2036` ("SuperSPARC v3"); gaps lines 117-119 |
+| 31:24 | IMPL/VER | 0x01 on SuperSPARC 3.x (IMPL 0, VER 1); 4.x VER 2, 5.x VER 3; SS-II VER 8/0xA. Viking 1990 says 0 | SS-II Table A-51; QEMU `cpu.c:479-490` (`mmu_version 0x01000800`); NetBSD `cpu.c:2025-2036` ("SuperSPARC v3") |
 | 18 | PF | data prefetcher; CC mode only, ignored in MBus mode. SS-II: "NO SUPPORT FOR SuperSPARC OR SuperSPARC II". Linux `VIKING_DPENABLE 0x40000` | Viking §4.9; SS-II `STP1021UG.txt:1285`; Linux `asm/viking.h:87-99` |
 | 16 | TC | table walks cacheable externally; never cached internally; **must be 0 in MBus mode**. Linux and NetBSD clear it without an MXCC | Viking §4.8.2, §4.11.11.1; Linux `mm/srmmu.c:1396-1409`; NetBSD `cpu.c:1845-1860` |
 | 15 | AC | cacheability of accesses that have no PTE (MMU off, bypass ASIs 0x20-0x2F); boot-mode fetches are always uncached. Linux clears it (`poke_viking`); NetBSD sets it temporarily with an MXCC to read the PROM's IOPTEs through ASI 0x20 (`iommu.c:354-394`) | Viking §4.3.4, §4.11.11.1, Tables 4-6/4-7; Linux `srmmu.c:1411-1415` |
@@ -528,7 +527,7 @@ need:
 | 10 | SB | store buffer enable (0 at reset) | Viking §4.12.6 |
 | 9 / 8 | IE / DE | cache enables (0 at reset) | Viking §4.7, §4.8 |
 | 7 | PSO | memory model | Viking §4.5.1.3 |
-| 6:2 | — | reserved. In this project: bit 6 is the L2-TLB enable (§6); bits 3:2 were the old core's CPU number, read by `runtime.S:43-46`, `t_smp.S:23-26`, `memstress.S:143-146` and OpenBIOS (gaps MMU-11, lines 427-434) | Viking §4.11.11.1; PLAN §3 phase 3 |
+| 6:2 | — | reserved. In this project: bit 6 is the L2-TLB enable (§6); bits 3:2 read 0; `runtime.S:43-46`, `t_smp.S:23-26`, `memstress.S:143-146` and OpenBIOS read them as a CPU number (MMU-11) | Viking §4.11.11.1; PLAN §3 phase 3 |
 | 1 | NF | §1.5 | |
 | 0 | EN | MMU enable | |
 
@@ -546,13 +545,13 @@ need:
     clear AC; leave PSO/NF/PE as found. On secondaries also clear
     ACTION.MIX (ASI 0x4C) (`srmmu.c:1376-1416`).
   - NetBSD: clears TC without an MXCC (`cpu.c:1845-1860`); never sets SE
-    (gaps SMP-3, lines 572-587); `viking_cache_enable` sets IE/DE after a
-    flash clear (gaps C-2; the body is not in this NetBSD tree).
+    (SMP-3); `viking_cache_enable` sets IE/DE after a
+    flash clear (C-2; the body is not in this NetBSD tree).
   - The suite: `MCR_ON = SE|IE|DE|EN = 0x4301`, written as `(MCNTL & ~BM) |
     0x4301` (`mmu_setup.S:61-76`, `:207-223`).
-  - OpenBIOS: secondaries 0x001; CPU 0 `| 0x4140` (SE, DE, bit 6) (gaps
-    SMP-3 lines 572-587). PLAN §3 phase 9 says 0x041 for the secondary
-    start; gaps says 0x001.
+  - OpenBIOS: secondaries 0x001; CPU 0 `| 0x4140` (SE, DE, bit 6)
+    (SMP-3). PLAN §3 phase 9 says 0x041 for the secondary start, not
+    0x001.
 
 ### 2.3 Fault, asynchronous-fault and other ASI 4 registers on the SS20
 
@@ -588,8 +587,7 @@ need:
 - **Context register:** 16 bits; t_mmu_ctx_bits writes walking ones over
   bits 0-31 and expects `readback == written & 0xffff`; 0x5a5a5a5a reads
   0x5a5a (`t_mmu.S:15-55`). OBP 2.25 publishes `mmu-nctx` = 0x10000 and
-  allocates a 256 KB context table; the POST walks 12 bits (gaps MMU-3,
-  lines 141-155, 322-339).
+  allocates a 256 KB context table; the POST walks 12 bits (MMU-3).
 - **CTPR:** Viking keeps CTPR[31:8] (24 bits). The suite checks bits 31:6
   ("POST mask 0xfffffc00, QEMU 0xffffffc0; bits 5:0 are not checked")
   (`t_mmu.S:12-14`, `:15-55`). QEMU `mmu_ctpr_mask 0xffffffc0`
@@ -701,10 +699,9 @@ need:
 - **Who uses ASI 6:** the SS20 POST TLB tests; the watchdog path of OBP 2.25
   dumps the D-TLB into NVRAM through ASI 6; no OS uses it in the normal
   path (Linux, NetBSD checked); NeXTSTEP is suspected of invalidating TLB
-  entries through it (gaps lines 156-160, MMU-2 lines 305-320, open
-  question 2). The old core acknowledged and ignored ASI 5/6/7; "a
-  diagnostic-only shadow array would pass the marches but not the flush
-  tests" (gaps MMU-2).
+  entries through it (MMU-2). Acknowledging and ignoring ASI 5/6/7 is not
+  enough: "a diagnostic-only shadow array would pass the marches but not
+  the flush tests" (MMU-2).
 - **QEMU** fails t_mmu_diag_pattern (check 1 expects 0xaaaaa000, observes 0)
   and t_mmu_diag_flush (`tests/cpu/expected/ss20-qemu.log:83-97`); none of
   the numbered deviations covers it.
@@ -732,7 +729,7 @@ need:
   - **OBP 2.25 keeps the module ID in ASI 0x38 VA 0:** "Every CPU copies
     the MSI MID register (pa `0xF_E000_2000`) into ASI 0x38 va 0; with IOMMU
     IMPL = 0 it then reads its MID back from ASI 0x38 va 0 … and ORs in 8"
-    (gaps SMP-1, lines 121-128, 542-560).
+    (SMP-1).
   - **Suite:** `stda {0xa, 0x12345678},[0] 0x38` and `{0x5, 0x9abcdef0},
     [0x100] 0x38`, `ldda` both back exactly (`t_iu2.S:235-281`,
     t_asi_width checks 2-5; header: "ASI 0x38 va 0 and 0x100 … must hold
@@ -764,11 +761,11 @@ need:
   keeps `val & 0x1fff` at any address (`ldst_helper.c:1124-1135`).
   - **Users:** OBP 2.25 `obp_cache_init` writes 0; Linux `poke_viking`
     read-modify-writes it on secondaries (clears MIX); Solaris 8 writes
-    0x1000 (MIX) and loops until it reads 0x1000 back (gaps MMU-12, lines
-    436-447; iu-notes §6.5).
+    0x1000 (MIX) and loops until it reads 0x1000 back (MMU-12;
+    iu-notes §6.5).
   - **Suite** (`t_iu2.S:235-281`, t_asi_width): `sta 0x100,[0] 0x0c`, then
-    `sta %g0,[0] 0x4c`, the ASI 0x0C tag must be unchanged (check 1: the
-    old core decoded only 6 ASI bits so 0x4C aliased 0x0C, MMU-12); ACTION
+    `sta %g0,[0] 0x4c`, the ASI 0x0C tag must be unchanged (check 1: all 8
+    ASI bits are decoded, so 0x4C must not alias 0x0C, MMU-12); ACTION
     writes 0x1000 / 0x0aaa / 0 must read back the same (checks 6-8, "13
     bits in QEMU").
   - Viking decodes all 8 ASI bits; "an error occurs on all access to
@@ -833,8 +830,7 @@ need:
   75": "the C bit from the PTE"). C = 1 also drives the CCHBL_ pin
   (Viking §4.11.1 C).
 - **Project decision (PLAN §2 lines 112-114; §6 E3 line 342):** "main
-  memory cached even where a PTE says C = 0 (this was the VHDL core's E3
-  fix)". Test `t_cache_force.S:1-12`: "The SS20 MMU sets C in a TLB entry
+  memory cached even where a PTE says C = 0". Test `t_cache_force.S:1-12`: "The SS20 MMU sets C in a TLB entry
   whose page is in main memory (pa[35:32] = 0) while snooping is on
   (MCNTL.SE), whatever the PTE's C bit." Reason given: "the Sun OBP 2.25
   maps everything it gives a client program uncacheable on a module
@@ -852,8 +848,8 @@ need:
 
 - **MID:** sampled at reset from ADDR[3:0]; any value but 0 (0 is the boot
   space) (Viking §8.3). Sun-4M modules use MIDs 8-11; the MSI MID register
-  at pa 0xF_E000_2000 returns the requester's MID (gaps SMP-1, lines
-  542-560; `docs/arch/memory-map.md:34-36`).
+  at pa 0xF_E000_2000 returns the requester's MID (SMP-1;
+  `docs/arch/memory-map.md:34-36`).
 - **Port register** (Viking §8.6.1.4, §8.10, page image; errata "Page
   199"): MBus port registers are read with non-cacheable accesses "to
   physical addresses in the range 0xff1000000 → 0xfff000000, depending on
@@ -1023,7 +1019,7 @@ hardware reset; flash clear does not touch data.
   (`listing.s:46375-46379`), Forth `clear-vcache` and `vcache-off`
   (`forth-dictionary.txt:9128-9148`); Linux `viking_flush_icache/dcache`
   (`sta %g0,[%g0] 0x36/0x37`) and `viking_unlock_*` (`[0x80000000]`)
-  (`asm/viking.h:115-145`); NetBSD `viking_cache_enable` (gaps C-2). QEMU
+  (`asm/viking.h:115-145`); NetBSD `viking_cache_enable` (C-2). QEMU
   ignores stores to 0x36/0x37 and faults on loads (`ldst_helper.c:1094-1101`,
   `:771-774`).
 
@@ -1049,8 +1045,8 @@ hardware reset; flash clear does not touch data.
     `t_mmu_tlb_flush`, `t_mmu_l2`, `t_cache2`, `t_cache3` flush lines with it
     after normal stores. In a write-through cache this has no visible
     effect except in t_cache_flush_miss, which flushes a line whose page is
-    no longer in the D-TLB ("on a DTLB miss they flush PA = VA" was the old
-    core's bug, gaps C-3).
+    no longer in the D-TLB (on a D-TLB miss the flush must not use PA = VA;
+    C-3).
   - QEMU ignores stores to 0x10-0x14 and faults loads
     (`ldst_helper.c:1054-1063`).
 - **Mode dependence:** the task asked how the flushes behave in MBus vs CC
@@ -1132,8 +1128,8 @@ hardware reset; flash clear does not touch data.
 - **Disagreement inside the project:** the task statement and
   `docs/arch/cpu.md:227-237` plan "I-cache and D-cache of 16 KB, 4-way,
   32-byte lines"; `t_cache_diag` and the POST expect the real I-cache image
-  (5 ways × 64 sets × 64-byte lines, two valid bits) and gaps C-6 says "The
-  PROMs publish the real geometry" (gaps lines 527-538). bus.md says the
+  (5 ways × 64 sets × 64-byte lines, two valid bits), and the PROMs publish
+  the real geometry (C-6). bus.md says the
   line transfer is 32 bytes (`docs/arch/bus.md:65-86`); Viking fills each
   32-byte half-line separately on the MBus (only 32-byte bursts, Viking
   §8.1).
@@ -1146,7 +1142,7 @@ hardware reset; flash clear does not touch data.
   ASI 0x0D way VA[28:26], set VA[11:6], doubleword VA[5:3] (5 × 64 × 8);
   PTAG `0x80000000 | way<<26 | set<<6`, all-ones reads {0x03000000,
   0x00ffffff}; STAG `0x40000000 | set<<6`, lo 0x00001f1e.
-- **Index-reach rule** (gaps C-6, lines 527-538): OS flush loops reach
+- **Index-reach rule** (C-6): OS flush loops reach
   every set as long as a tag-ASI write or line flush hits all ways at an
   index and the way size (4 KB) is not larger than the published cache.
   `mmu_off` clears tags through 0x0E/0x0C at a 32-byte stride over VA
@@ -1206,8 +1202,7 @@ through a mapping AT 1 (0x836); ldstub is a store (AT 4, 0x896).
   EMC timeout test wants `SFSR & ~0x300 == 0x836`, SFAR 0x20000000, the
   second SFSR read 0, and tests `MCNTL == 0x800`; the MBus-to-EBus timeout
   test 0x436 (BE). The SBus time-out test reads pa 0xE_0000_0010 and expects
-  SFSR 0x816 (`t_buserr.S:1-21`). SS5 POST: 0x816 (SBus) / 0x416 (EBus)
-  (gaps lines 95-96).
+  SFSR 0x816 (`t_buserr.S:1-21`). SS5 POST: 0x816 (SBus) / 0x416 (EBus).
 - **SFSR values in t_buserr** (decode: bit 11 TO, 9:8 L, 7:5 AT, 4:2 FT, 1
   FAV, 0 OW):
 
@@ -1310,8 +1305,8 @@ ASI 6 writes creating usable translations (with the PTE's V bit, here
 
 ### 5.4 What `wdtest` expects (`tests/cpu/src/wdtest.S`, PLAN §6 IU-1)
 
-- First boot: reads `lda [0xb00] 4` (the old core's **non-clearing SFSR
-  alias**, gaps lines 294-296); EM clear → store 0x57444f47 at 0x201000,
+- First boot: reads `lda [0xb00] 4` (the project-private **non-clearing
+  SFSR alias**); EM clear → store 0x57444f47 at 0x201000,
   print "WD?", clear ET, `ta 0x7f` (error mode).
 - Second boot: system status `lda [0xf1f00000] 0x2f & 0x10 == 0x10`
   (check 1); the marker survived (2); `lda [0x300] 4 & 0x20000` set (3);
@@ -1334,14 +1329,13 @@ ASI 6 writes creating usable translations (with the PTE's V bit, here
   (ASI 6) for the POST"); §3 phase 3 ("the L2 TLB/PTP cache (MCNTL bit 6;
   an ASI 5/6/7 write drops the TLBs, which NeXTSTEP needs)"); §6 L2 line
   343 ("L2 TLB safe to switch at run time; ASI 5/6/7 writes drop the
-  TLBs", `t_mmu_l2`). OpenBIOS CPU 0 sets 0x4140 (SE, DE, bit 6) (gaps
-  SMP-3). `tlbbench.S -DTB_L2TLB` sets bit 6 (`tlbbench.S:1-40`).
-- **Old design and its faults** (gaps CFG-1, lines 602-622): a 256-entry
-  level-3 PTE block RAM with an 8-bit generation in the tag, bumped on each
-  flush and swept 2 entries per flush; the RAM survived reset, so
-  "switching the option on at run time after 256 flushes can revive stale
-  entries". Fix proposed there: sweep all entries after reset and whenever
-  the enable rises.
+  TLBs", `t_mmu_l2`). OpenBIOS CPU 0 sets 0x4140 (SE, DE, bit 6)
+  (SMP-3). `tlbbench.S -DTB_L2TLB` sets bit 6 (`tlbbench.S:1-40`).
+- **Pitfall** (CFG-1): a 256-entry level-3 PTE block RAM with an 8-bit
+  generation in the tag, bumped on each flush and swept 2 entries per
+  flush, keeps its contents over reset, so switching the option on at run
+  time after 256 flushes can revive stale entries. Remedy: sweep all
+  entries after reset and whenever the enable rises.
 - **Requirement: invisible** (`t_mmu_l2.S:1-16`): "a correct OS cannot tell
   it from a larger TLB". Three tests (MARK(i) = 0x4c200000 + i; PTE changes
   are normal stores to MT_L3 + 21×4 followed by `sta [VA] 0x10`; bit 6 set
@@ -1368,12 +1362,11 @@ ASI 6 writes creating usable translations (with the PTE's V bit, here
   the cached PTE on a TLB hit (§1.6). t_mmu_l2_probe expects the memory PTE
   for an entry that should still be in a 64-entry TLB; the test therefore
   requires the probe to bypass (or the walk to refresh) the cached entry.
-  gaps MMU-6 records that the old core's BSD_MODE probe also flushed the
-  matching TLB entry "so it never returns a stale TLB entry (the reason
-  given for NetBSD)" (gaps lines 374-385).
+  A probe that also flushes the matching TLB entry never returns a stale
+  TLB entry, which NetBSD needs (MMU-6).
 - **ASI 5 and 7:** Viking has neither (§2.5); the project requires that
   writes to them drop the TLBs (PLAN line 343). NeXTSTEP is the suspected
-  user (gaps open question 2).
+  user.
 
 ---
 
@@ -1382,8 +1375,8 @@ ASI 6 writes creating usable translations (with the PTE's V bit, here
 Phase 3 exit (PLAN §3, lines 172-185): t_mmu, t_mmu_diag, t_mmu_l2,
 t_mmu_swift (expected skips on the SS20), t_cache*, t_buserr, memstress,
 tlbbench and bmbench pass, and the suite runs from the real boot address.
-The VHDL core passes every MMU/cache/buserr test (`expected/ss20-core-hw.log`,
-76 pass / 0 fail / 2 skip); QEMU SS20 55 / 12 / 11 (`expected/ss20-qemu.log:106`).
+The suite expects every MMU/cache/buserr test to pass on the board
+(`expected/ss20-core-hw.log`, 76 pass / 0 fail / 2 skip); QEMU SS20 55 / 12 / 11 (`expected/ss20-qemu.log:106`).
 
 ### 7.1 Shared set-up (`mmu_setup.S`)
 
@@ -1451,12 +1444,11 @@ The VHDL core passes every MMU/cache/buserr test (`expected/ss20-core-hw.log`,
   | NF set, invalid load | none | SFSR & ~1 = 0x326 | QEMU sets OW (deviation 9) |
 
   L is the level of the faulting PTE for protection and privilege faults too
-  (gaps MMU-8).
+  (MMU-8).
 - **t_mmu_ifault** (`:301-332`): `jmpl` to 0x2908b8 (invalid page): tt 1,
   trap PC 0x2908b8, SFSR **0x366** (L 3, AT 3, FT 1, FAV, **no OW**), then
   0. Reason: Solaris 8's `get_fault_type` treats OW as "overwritten",
-  re-probes and loops (SFSR 0x347 for a user text fault) (gaps MMU-7/8,
-  lines 387-406). Note FAV is set here although Viking never writes the
+  re-probes and loops (SFSR 0x347 for a user text fault) (MMU-7/8). Note FAV is set here although Viking never writes the
   SFAR for instruction faults.
 - **t_mmu_diag_pattern / t_mmu_diag_flush:** §2.5.
 - **t_mmu_l2_asi6 / _enable / _probe:** §6.

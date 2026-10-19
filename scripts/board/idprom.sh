@@ -2,8 +2,7 @@
 # idprom.sh --obp FILE [--log FILE] - the machine's identity from the host:
 # Main (support/sun, sun_idprom.cpp) sends an ID PROM made from the MiSTer's
 # Ethernet address on ioctl index 64; the core takes its last three bytes as
-# the serial of a blank NVRAM's IDPROM (rtl/mister/ss_core.vhd, nvram_sd.vhd,
-# rtl/sun4m/iram_rtc.vhd). Last line: PASS or FAIL.
+# the serial of a blank NVRAM's IDPROM (rtl/mister/nvram_sd.sv). Last line: PASS or FAIL.
 #
 #   1. a blank NVRAM image under the Sun OBP: the banner shows 8:0:20 and the
 #      MiSTer's eth0 bytes 3-5 (Ethernet address and Host ID 72xxxxxx), and

@@ -5,7 +5,7 @@
 # (cpu_timing_top.sv: registered inputs and outputs), on the build machine
 # (scripts/local.env: BUILD_HOST, default misterubuntu). Prints the worst
 # slack and the 40 worst paths, into scratch/cpu_timing/TAG.txt as well.
-# A fit takes ~10-20 minutes; much quicker than a hybrid build for
+# A fit takes ~10-20 minutes; much quicker than a full build for
 # iterating on the CPU's paths.
 set -euo pipefail
 cd "$(dirname "$0")/../.."

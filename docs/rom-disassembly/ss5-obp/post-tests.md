@@ -1,18 +1,11 @@
 # SPARCstation 5 POST (OBP 2.15): test catalogue
 
 Every self-test in the power-on self-test (POST) of `ss5.bin`, with its entry
-address, algorithm, the exact registers, ASIs and values it uses, what it
-prints when it fails, and whether the core appears to implement the hardware
-it touches. See [`README.md`](README.md) for how the POST is entered and left,
+address, algorithm, the exact registers, ASIs and values it uses, and what it
+prints when it fails. See [`README.md`](README.md) for how the POST is entered and left,
 [`hardware-access.md`](hardware-access.md) for the register map and
 [`listing.s`](listing.s) for the code. Addresses are PROM link addresses
 (`0x70000000` + offset).
-
-The **Core** entries are one-word verdicts from a quick look at `src/` (and
-[`docs/HARDWARE_GAPS.md`](../../legacy/HARDWARE_GAPS.md)), not an audit:
-*present* = the core has the hardware, *absent* = it does not, *unknown* =
-not determined. Where "present" hides a mismatch that would make the test fail,
-the entry says so.
 
 ## 1. Conventions
 
@@ -49,63 +42,63 @@ names match the SS5 service manual's "Full Diagnostic Mode Tests" table
 failure path (§11.2): **CPU** = Num Lock LED + "Replace CPU Board", **NVRAM**
 = Scroll Lock + "Replace NVRAM", **SIMM** = Compose + "Replace (%s) SIMM".
 
-| # | Test (as printed) | Routine @ addr | Called at | Fail → | Core | QEMU |
-|---|---|---|---|---|---|---|
-| 1 | MMU Context Table Reg Test | `post_mmu_regs` @ 0x70006000 | 0x70009900 | CPU | present | pass |
-| 2 | MMU Context Register Test | ″ | ″ | CPU | present | pass |
-| 3 | MMU TLB Replace Ctrl Reg Tst | ″ | ″ | CPU | **absent** (aliases PCR) | pass |
-| 4 | MMU Sync Fault Stat Reg Test | ″ | ″ | CPU | **absent** | pass |
-| 5 | MMU Sync Fault Addr Reg Test | ″ | ″ | CPU | **absent** | pass |
-| 6 | MMU TLB RAM NTA Pattern Test | `post_mmu_tlb_nta` @ 0x70005eb8 | 0x70009914 | CPU | **absent** | **fail** |
-| 7 | MMU TLB CAM NTA Pattern Test | ″ | ″ | CPU | **absent** | – |
-| 8 | MMU TLB LCAM NTA Pattern Test | ″ | ″ | CPU | **absent** | – |
-| 9 | IOMMU SBUS Config Regs Test | `post_iommu_regs` @ 0x70005a40 | `post_iommu_group` ← 0x70009928 | CPU | absent | pass |
-| 10 | IOMMU Control Reg Test | ″ @ 0x70005aa4 | ″ | CPU | present (would fail) | **fail** |
-| 11 | IOMMU Base Address Reg Test | ″ @ 0x70005ae8 | ″ | CPU | present (would fail) | – |
-| 12 | IOMMU TLB Flush Entry Test | `post_iommu_tlb_flush` @ 0x70005be0 | ″ | CPU | absent | – |
-| 13 | IOMMU TLB Flush All Test | ″ @ 0x70005c80 | ″ | CPU | absent | – |
-| 14 | SBus Read Timeout Test | `post_sbus_read_timeout` @ 0x70006360 | ″ | CPU | absent | – |
-| 15 | EBus Read Timeout Test | `post_ebus_read_timeout` @ 0x70006240 | ″ | CPU | absent | – |
-| 16 | D-Cache RAM NTA Test | `post_dcache_ram_nta` @ 0x70004f9c | 0x7000994c | CPU | **absent** | – |
-| 17 | D-Cache TAG NTA Test | `post_dcache_tag_nta` @ 0x70005000 | 0x70009960 | CPU | unknown | – |
-| 18 | I-Cache RAM NTA Test | `post_icache_ram_nta` @ 0x7000516c | 0x70009984 | CPU | **absent** | – |
-| 19 | I-Cache TAG NTA Test | `post_icache_tag_nta` @ 0x700051d0 | 0x70009998 | CPU | unknown | – |
-| 20 | Memory Address Pattern Test | inline, `mem_march_test` @ 0x7000a55c | 0x700099bc | SIMM | present | pass |
-| 21 | FPU Register File Test | `post_fpu_regfile` @ 0x700023c0 | `post_fpu_basic_group` ← 0x70009a68 | CPU | present | pass |
-| 22 | FPU Misaligned Reg Pair Test | `post_fpu_misaligned_pair` @ 0x700026b8 | ″ | CPU | unknown | pass |
-| 23 | FPU Single-precision Tests | `post_fpu_single` @ 0x70002770 | ″ | CPU | present | pass |
-| 24 | FPU Double-precision Tests | `post_fpu_double` @ 0x700029bc | ″ | CPU | present | pass |
-| 25 | FPU SP Invalid CEXC Test | `post_fpu_sp_invalid_cexc` @ 0x70002b44 | `post_fpu_cexc_group` ← 0x70009a8c | CPU | unknown | pass |
-| 26 | FPU SP Overflow CEXC Test | `post_fpu_sp_overflow_cexc` @ 0x70002c08 | ″ | CPU | unknown | pass |
-| 27 | FPU SP Divide-by-0 CEXC Test | `post_fpu_sp_divzero_cexc` @ 0x70002d7c | ″ | CPU | unknown | pass |
-| 28 | FPU SP Inexact CEXC Test | `post_fpu_sp_inexact_cexc` @ 0x70002e38 | ″ | CPU | unknown | pass |
-| 29 | FPU SP Trap Priority > Test | `post_fpu_sp_trap_prio_gt` @ 0x70002f00 | ″ | CPU | unknown | pass |
-| 30 | FPU SP Trap Priority < Test | `post_fpu_sp_trap_prio_lt` @ 0x70002fb4 | ″ | CPU | unknown | **fail** |
-| 31 | FPU DP Invalid CEXC Test | `post_fpu_dp_invalid_cexc` @ 0x70003088 | ″ | CPU | unknown | – |
-| 32 | FPU DP Overflow CEXC Test | `post_fpu_dp_overflow_cexc` @ 0x70003164 | ″ | CPU | unknown | – |
-| 33 | FPU DP Divide-by-0 CEXC Test | `post_fpu_dp_divzero_cexc` @ 0x7000330c | ″ | CPU | unknown | – |
-| 34 | FPU DP Inexact CEXC Test | `post_fpu_dp_inexact_cexc` @ 0x700033e0 | ″ | CPU | unknown | – |
-| 35 | FPU DP Trap Priority > Test | `post_fpu_dp_trap_prio_gt` @ 0x700034c4 | ″ | CPU | unknown | – |
-| 36 | FPU DP Trap Priority < Test | `post_fpu_dp_trap_prio_lt` @ 0x70003580 | ″ | CPU | unknown | – |
-| 37 | PROC0 Interrupt Regs Tests | `post_proc0_irq_regs` @ 0x70005240 | 0x70009ab8 | CPU | present | pass |
-| 38 | Soft Interrupts OFF Test | `post_soft_irq_off` @ 0x7000535c | 0x70009acc | CPU | present | pass |
-| 39 | Soft Interrupts ON Test | `post_soft_irq_on` @ 0x70005498 | 0x70009af0 | CPU | present | pass |
-| 40 | PROC0 User Timer Test | `post_proc0_user_timer` @ 0x700065c0 | 0x70009b04 | CPU | present | **fail** |
-| 41 | PROC0 Counter/Timer Test | `post_proc0_counter_timer` @ 0x70006814 | 0x70009b18 | CPU | present | **fail** |
-| 42 | DMA2 E_CSR Register Test | `post_dma2_e_csr` @ 0x700042ec | 0x70009b3c | CPU | present (no SLAVE_ERR) | **fail** |
-| 43 | LANCE Address Port Tests | `post_lance_addr_port` @ 0x70005680 | 0x70009b50 | CPU | present (no SLAVE_ERR) | – |
-| 44 | LANCE Data Port Tests | `post_lance_data_port` @ 0x70005798 | 0x70009b64 | CPU | present (no SLAVE_ERR) | – |
-| 45 | DMA2 D_CSR Register Test | `post_dma2_d_csr` @ 0x70003b50 | 0x70009b78 | CPU | present (no SLAVE_ERR) | – |
-| 46 | DMA2 D_ADDR Register Test | `post_dma2_d_addr` @ 0x70003c5c | 0x70009b8c | CPU | present (no SLAVE_ERR) | – |
-| 47 | DMA2 D_BCNT Register Test | `post_dma2_d_bcnt` @ 0x70003dfc | 0x70009bb0 | CPU | absent | – |
-| 48 | DMA2 D_NADDR Register Test | `post_dma2_d_naddr` @ 0x70003f44 | 0x70009bc4 | CPU | absent | – |
-| 49 | ESP Registers Tests | `post_esp_regs` @ 0x70004bc0 | 0x70009bd8 | CPU | present | – |
-| 50 | DMA2 P_CSR Register Test | `post_dma2_p_csr` @ 0x700044a0 | 0x70009bec | CPU | absent | – |
-| 51 | DMA2 P_ADDR Register Test | `post_dma2_p_addr` @ 0x7000455c | 0x70009c00 | CPU | absent | – |
-| 52 | DMA2 P_BCNT Register Test | `post_dma2_p_bcnt` @ 0x7000461c | 0x70009c14 | CPU | absent | – |
-| 53 | PPORT Registers Tests | `post_pport_regs` @ 0x700046ec | 0x70009c28 | CPU | absent | – |
-| 54 | NVRAM Access Test | `post_nvram_access` @ 0x70006c00 | 0x70009c4c | NVRAM | present | pass |
-| 55 | TOD Registers Test | `post_tod_regs` @ 0x70006cf8 | 0x70009c60 | NVRAM | present | **fail** |
+| # | Test (as printed) | Routine @ addr | Called at | Fail → | QEMU |
+|---|---|---|---|---|---|
+| 1 | MMU Context Table Reg Test | `post_mmu_regs` @ 0x70006000 | 0x70009900 | CPU | pass |
+| 2 | MMU Context Register Test | ″ | ″ | CPU | pass |
+| 3 | MMU TLB Replace Ctrl Reg Tst | ″ | ″ | CPU | pass |
+| 4 | MMU Sync Fault Stat Reg Test | ″ | ″ | CPU | pass |
+| 5 | MMU Sync Fault Addr Reg Test | ″ | ″ | CPU | pass |
+| 6 | MMU TLB RAM NTA Pattern Test | `post_mmu_tlb_nta` @ 0x70005eb8 | 0x70009914 | CPU | **fail** |
+| 7 | MMU TLB CAM NTA Pattern Test | ″ | ″ | CPU | – |
+| 8 | MMU TLB LCAM NTA Pattern Test | ″ | ″ | CPU | – |
+| 9 | IOMMU SBUS Config Regs Test | `post_iommu_regs` @ 0x70005a40 | `post_iommu_group` ← 0x70009928 | CPU | pass |
+| 10 | IOMMU Control Reg Test | ″ @ 0x70005aa4 | ″ | CPU | **fail** |
+| 11 | IOMMU Base Address Reg Test | ″ @ 0x70005ae8 | ″ | CPU | – |
+| 12 | IOMMU TLB Flush Entry Test | `post_iommu_tlb_flush` @ 0x70005be0 | ″ | CPU | – |
+| 13 | IOMMU TLB Flush All Test | ″ @ 0x70005c80 | ″ | CPU | – |
+| 14 | SBus Read Timeout Test | `post_sbus_read_timeout` @ 0x70006360 | ″ | CPU | – |
+| 15 | EBus Read Timeout Test | `post_ebus_read_timeout` @ 0x70006240 | ″ | CPU | – |
+| 16 | D-Cache RAM NTA Test | `post_dcache_ram_nta` @ 0x70004f9c | 0x7000994c | CPU | – |
+| 17 | D-Cache TAG NTA Test | `post_dcache_tag_nta` @ 0x70005000 | 0x70009960 | CPU | – |
+| 18 | I-Cache RAM NTA Test | `post_icache_ram_nta` @ 0x7000516c | 0x70009984 | CPU | – |
+| 19 | I-Cache TAG NTA Test | `post_icache_tag_nta` @ 0x700051d0 | 0x70009998 | CPU | – |
+| 20 | Memory Address Pattern Test | inline, `mem_march_test` @ 0x7000a55c | 0x700099bc | SIMM | pass |
+| 21 | FPU Register File Test | `post_fpu_regfile` @ 0x700023c0 | `post_fpu_basic_group` ← 0x70009a68 | CPU | pass |
+| 22 | FPU Misaligned Reg Pair Test | `post_fpu_misaligned_pair` @ 0x700026b8 | ″ | CPU | pass |
+| 23 | FPU Single-precision Tests | `post_fpu_single` @ 0x70002770 | ″ | CPU | pass |
+| 24 | FPU Double-precision Tests | `post_fpu_double` @ 0x700029bc | ″ | CPU | pass |
+| 25 | FPU SP Invalid CEXC Test | `post_fpu_sp_invalid_cexc` @ 0x70002b44 | `post_fpu_cexc_group` ← 0x70009a8c | CPU | pass |
+| 26 | FPU SP Overflow CEXC Test | `post_fpu_sp_overflow_cexc` @ 0x70002c08 | ″ | CPU | pass |
+| 27 | FPU SP Divide-by-0 CEXC Test | `post_fpu_sp_divzero_cexc` @ 0x70002d7c | ″ | CPU | pass |
+| 28 | FPU SP Inexact CEXC Test | `post_fpu_sp_inexact_cexc` @ 0x70002e38 | ″ | CPU | pass |
+| 29 | FPU SP Trap Priority > Test | `post_fpu_sp_trap_prio_gt` @ 0x70002f00 | ″ | CPU | pass |
+| 30 | FPU SP Trap Priority < Test | `post_fpu_sp_trap_prio_lt` @ 0x70002fb4 | ″ | CPU | **fail** |
+| 31 | FPU DP Invalid CEXC Test | `post_fpu_dp_invalid_cexc` @ 0x70003088 | ″ | CPU | – |
+| 32 | FPU DP Overflow CEXC Test | `post_fpu_dp_overflow_cexc` @ 0x70003164 | ″ | CPU | – |
+| 33 | FPU DP Divide-by-0 CEXC Test | `post_fpu_dp_divzero_cexc` @ 0x7000330c | ″ | CPU | – |
+| 34 | FPU DP Inexact CEXC Test | `post_fpu_dp_inexact_cexc` @ 0x700033e0 | ″ | CPU | – |
+| 35 | FPU DP Trap Priority > Test | `post_fpu_dp_trap_prio_gt` @ 0x700034c4 | ″ | CPU | – |
+| 36 | FPU DP Trap Priority < Test | `post_fpu_dp_trap_prio_lt` @ 0x70003580 | ″ | CPU | – |
+| 37 | PROC0 Interrupt Regs Tests | `post_proc0_irq_regs` @ 0x70005240 | 0x70009ab8 | CPU | pass |
+| 38 | Soft Interrupts OFF Test | `post_soft_irq_off` @ 0x7000535c | 0x70009acc | CPU | pass |
+| 39 | Soft Interrupts ON Test | `post_soft_irq_on` @ 0x70005498 | 0x70009af0 | CPU | pass |
+| 40 | PROC0 User Timer Test | `post_proc0_user_timer` @ 0x700065c0 | 0x70009b04 | CPU | **fail** |
+| 41 | PROC0 Counter/Timer Test | `post_proc0_counter_timer` @ 0x70006814 | 0x70009b18 | CPU | **fail** |
+| 42 | DMA2 E_CSR Register Test | `post_dma2_e_csr` @ 0x700042ec | 0x70009b3c | CPU | **fail** |
+| 43 | LANCE Address Port Tests | `post_lance_addr_port` @ 0x70005680 | 0x70009b50 | CPU | – |
+| 44 | LANCE Data Port Tests | `post_lance_data_port` @ 0x70005798 | 0x70009b64 | CPU | – |
+| 45 | DMA2 D_CSR Register Test | `post_dma2_d_csr` @ 0x70003b50 | 0x70009b78 | CPU | – |
+| 46 | DMA2 D_ADDR Register Test | `post_dma2_d_addr` @ 0x70003c5c | 0x70009b8c | CPU | – |
+| 47 | DMA2 D_BCNT Register Test | `post_dma2_d_bcnt` @ 0x70003dfc | 0x70009bb0 | CPU | – |
+| 48 | DMA2 D_NADDR Register Test | `post_dma2_d_naddr` @ 0x70003f44 | 0x70009bc4 | CPU | – |
+| 49 | ESP Registers Tests | `post_esp_regs` @ 0x70004bc0 | 0x70009bd8 | CPU | – |
+| 50 | DMA2 P_CSR Register Test | `post_dma2_p_csr` @ 0x700044a0 | 0x70009bec | CPU | – |
+| 51 | DMA2 P_ADDR Register Test | `post_dma2_p_addr` @ 0x7000455c | 0x70009c00 | CPU | – |
+| 52 | DMA2 P_BCNT Register Test | `post_dma2_p_bcnt` @ 0x7000461c | 0x70009c14 | CPU | – |
+| 53 | PPORT Registers Tests | `post_pport_regs` @ 0x700046ec | 0x70009c28 | CPU | – |
+| 54 | NVRAM Access Test | `post_nvram_access` @ 0x70006c00 | 0x70009c4c | NVRAM | pass |
+| 55 | TOD Registers Test | `post_tod_regs` @ 0x70006cf8 | 0x70009c60 | NVRAM | **fail** |
 
 QEMU: "pass"/"**fail**" as observed (§13); "–" = not observed (an earlier test
 stops the POST, or it was skipped to reach later tests).
@@ -145,13 +138,13 @@ implemented bits, `%i2` = bits forced on in every write):
    with %1 = the ASI-4 VA, %2 = expected, %3 = observed (masked), %4 = xor,
    then "WARNING: Suspect Swift Module"; returns 0xff.
 
-| # | Name printed | ASI 4 VA | Mask (implemented bits) | Forced bits | Register | Core |
-|---|---|---|---|---|---|---|
-| 1 | MMU Context Table Reg Test | `0x100` | `0x00ffffc0` | 0 | context table pointer | present |
-| 2 | MMU Context Register Test | `0x200` | `0x000000ff` | 0 | context (8 bits) | present |
-| 3 | MMU TLB Replace Ctrl Reg Tst | `0x1000` | `0x0011ffff` | `0x40` | TLB replacement control | **absent** — the core decodes ASI 4 VA[11:8] only (`rtl/cpu/mcu_simple.vhd:970`, `mcu_multi.vhd:1045`), so `0x1000` is the PCR there: this test would write walking patterns into the PCR |
-| 4 | MMU Sync Fault Stat Reg Test | `0x1300` | `0x00016fff` | 0 | SFSR, diagnostic (writable) alias | **absent** (aliases `0x300`; a write clears the SFSR) |
-| 5 | MMU Sync Fault Addr Reg Test | `0x1400` | `0xffffffff` | 0 | SFAR, diagnostic alias | **absent** (aliases `0x400`, not writable) |
+| # | Name printed | ASI 4 VA | Mask (implemented bits) | Forced bits | Register |
+|---|---|---|---|---|---|
+| 1 | MMU Context Table Reg Test | `0x100` | `0x00ffffc0` | 0 | context table pointer |
+| 2 | MMU Context Register Test | `0x200` | `0x000000ff` | 0 | context (8 bits) |
+| 3 | MMU TLB Replace Ctrl Reg Tst | `0x1000` | `0x0011ffff` | `0x40` | TLB replacement control |
+| 4 | MMU Sync Fault Stat Reg Test | `0x1300` | `0x00016fff` | 0 | SFSR, diagnostic (writable) alias |
+| 5 | MMU Sync Fault Addr Reg Test | `0x1400` | `0xffffffff` | 0 | SFAR, diagnostic alias |
 
 Under QEMU 8.2.2 all five pass (console shows the five names and no error).
 
@@ -173,9 +166,6 @@ Three calls of the march routine `nta_march_test(base, len, stride, asi, mask)`
 - **Evidence:** QEMU fails the first one with
   `Address= 000000fc, exp= 07ffffdc, obs= 00000000` — the first read of the
   descending element; QEMU has no TLB diagnostic access.
-- **Core:** **absent**: ASI 5/6/7 accesses are acknowledged and ignored
-  (`rtl/cpu/mcu_simple.vhd:678-684` "Diagnostic, on s'en fout"), so the core
-  fails here exactly like QEMU.
 
 The ASI 6 layout (PTE at `0x000+4n`, lower tag at `0x100+4n`, upper tag at
 `0x300+4n`, n = 0..63) is inferred from these masks, from `tlb_init_clear`
@@ -207,7 +197,6 @@ Called as one group, `post_iommu_group` (`0x700059e0`), from the sequencer at `0
      - The "other" register here is the IOMMU control register. So this test also toggles the IOMMU ME (enable) bit and RANGE; no DVMA is active.
 - **Pass criteria / expected values:** SSCR0 reads back `(written & 0x00010003)`. After P the first check expects **0x00000002**, after Q it expects **0x00010001**. All other bits read 0.
 - **On failure prints:** `L_70005e3c`: `ERROR  : Address= %1, exp= %2, obs= %3, xor= %4` with %1=register (0x10001010), %2=expected `%l5`, %3=observed `%l4`, %4=xor `%l7`. Then `WARNING: Suspect Swift Module`. No UNUMBER. The routine returns 1 and the group returns 0xff.
-- **Core:** absent (SSCR not decoded; `ts_iommu.vhd` lists it only in its header, HARDWARE_GAPS §row "Control space / IOMMU").
 
 ### 4.2 IOMMU Control Reg Test — `post_iommu_regs` @ 0x70005aa4
 - **Called:** the 2nd part of `post_iommu_regs`, reached by fall-through.
@@ -218,7 +207,6 @@ Called as one group, `post_iommu_group` (`0x700059e0`), from the sequencer at `0
   3. 0x70005ae0: if 0xff comes back, set `%g3`=1 and return.
 - **Pass criteria / expected values:** the read value equals `(written & 0x1d) | 0x04000000`. After P it expects **0x04000018**, after Q **0x04000005**. Bit 1 and bits 23:5 must read 0.
 - **On failure prints:** the same as above (`L_70005e3c`, Address=0x10000000, then `WARNING: Suspect Swift Module`).
-- **Core:** present. Two mismatches would make it fail: `ts_iommu.vhd:186-193` makes bit 1 (DE) writable, and the ROM expects bit 1 to read 0. IMPL/VER 0x04 matches.
 
 ### 4.3 IOMMU Base Address Reg Test — `post_iommu_regs` @ 0x70005ae8
 - **Called:** the 3rd part of `post_iommu_regs`.
@@ -229,7 +217,6 @@ Called as one group, `post_iommu_group` (`0x700059e0`), from the sequencer at `0
   3. 0x70005b24: if 0xff comes back, set `%g3`=1. 0x70005b2c: return `%i0`=`%g3`.
 - **Pass criteria / expected values:** the read value equals `written & 0x07fffc00`. After P it expects **0x025a5800**, after Q **0x05a5a400**.
 - **On failure prints:** `L_70005e3c` with Address=0x10000004, then `WARNING: Suspect Swift Module`.
-- **Core:** present. The register format would fail the test: `ts_iommu.vhd:196-199` stores bits 31:10 (the generic sun4m IBA[35:14] format), so bits 31:27 read back as written.
 
 ### 4.4 IOMMU TLB Flush Entry Test — `post_iommu_tlb_flush` @ 0x70005be0
 - **Called:** `post_iommu_group` 0x700059f8, the 2nd call. It runs only if `post_iommu_regs` passed.
@@ -250,7 +237,6 @@ Called as one group, `post_iommu_group` (`0x700059e0`), from the sequencer at `0
 - **On failure prints:**
   - `L_70005df4`: `ERROR  : Address= %1, exp= %2, obs= %3, xor= %4` with %1=ASI-6 address `%l4` (0x300..0x3fc), %2=expected tag (observed with bit 3 cleared or set as required), %3=observed tag, %4=xor. Then `UNUMBER: U0103`.
   - The routine returns `%g3`=1. On this path the IOMMU is left enabled.
-- **Core:** absent. `ts_iommu.vhd` has its own IOMMU TLB, separate from the CPU MMU; its address flush flushes everything (`ts_iommu.vhd:212-217`). The ROM needs IOPTEs that live in the CPU TLB and can be seen through ASI 6.
 
 ### 4.5 IOMMU TLB Flush All Test — `post_iommu_tlb_flush` @ 0x70005c80
 - **Called:** the 2nd part of `post_iommu_tlb_flush`, reached by fall-through.
@@ -262,7 +248,6 @@ Called as one group, `post_iommu_group` (`0x700059e0`), from the sequencer at `0
   4. Loop at 0x70005ccc: for all 64 entries, read `ASI6 [0x300+4k]`. Bit 3 must be clear (0x70005cd4).
 - **Pass criteria / expected values:** every upper tag has V (bit 3) = 0.
 - **On failure prints:** `L_70005dac`: `ERROR  : Address= %1, ...` with %1=ASI-6 address `%l5`, %2=observed with bit 3 cleared, %3=observed, %4=xor. Then `UNUMBER: U0103`. Returns 0xff.
-- **Core:** absent (same reason as above).
 
 ### 4.6 SBus Read Timeout Test — `post_sbus_read_timeout` @ 0x70006360
 - **Called:** `post_iommu_group` 0x70005a0c, the 3rd call.
@@ -283,7 +268,6 @@ Called as one group, `post_iommu_group` (`0x700059e0`), from the sequencer at `0
   - No trap: `L_70006528`: `ERROR  : No trap taken, expected %1` with %1=`%g5`=0x29, then `WARNING: Suspect Swift Module`.
   - Wrong SFAR or SFSR: `L_70006478`: `ERROR  : Address= %1, exp= %2, obs= %3, xor= %4` with %1=ASI-4 address (0x400 or 0x300), %2=expected, %3=observed, %4=xor. Then `UNUMBER: U0103` and `WARNING: Suspect Swift Module`.
   - Both paths return 0xff without restoring MID or the interrupt mask.
-- **Core:** absent. Unmapped reads return 0xBADACCE5 with an acknowledge (`ts_io.vhd:760`, HARDWARE_GAPS #13).
 
 ### 4.7 EBus Read Timeout Test — `post_ebus_read_timeout` @ 0x70006240
 - **Called:** `post_iommu_group` 0x70005a20, the 4th and last call.
@@ -295,7 +279,6 @@ Called as one group, `post_iommu_group` (`0x700059e0`), from the sequencer at `0
   - The steps are at 0x70006280/84 (mask set/clear), 0x70006290-98 (SBAE), 0x700062a8 (`%g5`=0x29), 0x70006304 (SFSR must be 0), and the pass path 0x7000631c..0x70006354.
 - **Pass criteria / expected values:** the trap is taken, SFAR = 0x71400300, `SFSR & ~0x3e0` = 0x416, then SFSR = 0.
 - **On failure prints:** as for the SBus test (`L_70006528` or `L_70006478`, `UNUMBER: U0103`, `WARNING: Suspect Swift Module`).
-- **Core:** absent (same as above).
 
 ## 5. Cache tests
 
@@ -304,12 +287,12 @@ the arrays only through the diagnostic ASIs. Each first and last calls
 `dcache_clear_tags` (`0x7000ac34`: `sta %g0,[16·n] 0xe`, n = 0..511) or
 `icache_clear_tags` (`0x7000ac10`: `sta %g0,[32·n] 0xc`, n = 0..511).
 
-| Name printed | Label @ addr | `nta_march_test` args | Array | Core |
-|---|---|---|---|---|
-| D-Cache RAM NTA Test | `post_dcache_ram_nta` @ 0x70004f9c | base 0, len `0x2000`, stride 4, ASI `0xf`, mask `0xffffffff` | 8 KiB D-cache data | **absent** (ASI 0xf ignored, `mcu_simple.vhd:863`) |
-| D-Cache TAG NTA Test | `post_dcache_tag_nta` @ 0x70005000 | base 0, len `0x2000`, stride `0x10`, ASI `0xe`, mask `0xffffefff` (bit 12 not stored) | 512 D-cache tags (16-byte lines) | unknown (ASI 0xe reads/writes `dcache_t_dr(0)` "way selection to do", `mcu_simple.vhd:839`) |
-| I-Cache RAM NTA Test | `post_icache_ram_nta` @ 0x7000516c | base 0, len `0x4000`, stride 4, ASI `0xd`, mask `0xffffffff` | 16 KiB I-cache data | **absent** (ASI 0xd ignored) |
-| I-Cache TAG NTA Test | `post_icache_tag_nta` @ 0x700051d0 | base 0, len `0x4000`, stride `0x20`, ASI `0xc`, mask `0xffffcfff` (bits 13:12 not stored) | 512 I-cache tags (32-byte lines) | unknown (ASI 0xc goes through the instruction side, `sCROSS`) |
+| Name printed | Label @ addr | `nta_march_test` args | Array |
+|---|---|---|---|
+| D-Cache RAM NTA Test | `post_dcache_ram_nta` @ 0x70004f9c | base 0, len `0x2000`, stride 4, ASI `0xf`, mask `0xffffffff` | 8 KiB D-cache data |
+| D-Cache TAG NTA Test | `post_dcache_tag_nta` @ 0x70005000 | base 0, len `0x2000`, stride `0x10`, ASI `0xe`, mask `0xffffefff` (bit 12 not stored) | 512 D-cache tags (16-byte lines) |
+| I-Cache RAM NTA Test | `post_icache_ram_nta` @ 0x7000516c | base 0, len `0x4000`, stride 4, ASI `0xd`, mask `0xffffffff` | 16 KiB I-cache data |
+| I-Cache TAG NTA Test | `post_icache_tag_nta` @ 0x700051d0 | base 0, len `0x4000`, stride `0x20`, ASI `0xc`, mask `0xffffcfff` (bits 13:12 not stored) | 512 I-cache tags (32-byte lines) |
 
 - **Called:** `post_sequencer` `0x7000994c` (D RAM), `0x70009960` (D TAG),
   `0x70009984` (I RAM), `0x70009998` (I TAG), between Caps Lock LED toggles.
@@ -345,7 +328,6 @@ Unused (no callers):
 - **Pass criteria / expected values:** every word reads back its address, then its complement.
 - **On failure prints:** `L_7000a724`: "ERROR  : Address= %1,  exp= %2, obs= %3, xor= %4" (string 0x70007a8c, two spaces before "exp"). %1 = address, %2 = exp & mask, %3 = obs & mask, %4 = xor. %i4 ≠ 0 (the sequencer passes 4), so `print_simm_unumber(address)` follows: "UNUMBER: " + the entry at 0x7000a9ce + ((addr & 0x0e000000) >> 21) + (addr & 4 ? 8 : 0). Bank 0..7 prints U0300, U0301, U0302, U0303, U0400, U0401, U0402, U0403; even and odd words give the same string. Returns 0xff. The sequencer then shows the SIMM LED and "FAILED ... Replace (%s) SIMM" (no argument for %s is prepared at the call site; guess: filled in later by the firmware).
 - **`mem_march_test_b` 0x7000a634:** never called. It is an address-line pair test: write 0xaaaaaaaa at base|a|b and 0x55555555 at base|a, base|b and base, then check base|a|b. a starts at 8, b at 0x10, both walk up to the size in %i1. Word offsets 0 and 4 (%i2). On failure it sets %g3 = 1 and returns **without** setting %i0 (0x7000a760).
-- **Core:** present (SDRAM). How sizing behaves on the core, with empty banks and with small SIMMs aliasing, was not checked.
 
 ### 6.2 Memory sizing — `mem_size_banks` @ 0x7000769c, `mem_probe_bank` @ 0x700075e0, `mem_size_to_code` @ 0x7000780c
 - **Called:** `mem_size_banks` only from `post_main` 0x70002188. `mem_probe_bank` only from 0x700076cc. `mem_size_to_code` only from 0x70007708.
@@ -399,7 +381,6 @@ Scratch memory: `%l0`/`%l4` = `base + 0x2000` where base = `%g2 & 0x0f000000`
 - **On failure** (`fpu_regfile_fail` `0x7000366c`): "ERROR  : FPU Registerfile
   Stuck-at Fault", then sixteen lines "%1 :  %2  %3" (register number
   0,2,…,0x1e and its two words), "WARNING: Suspect Swift Module".
-- **Core:** present (FPU register file, `rtl/cpu/fpu_regs_2r1w.vhd`).
 
 ### 7.2 FPU Misaligned Reg Pair Test — `post_fpu_misaligned_pair` @ 0x700026b8
 
@@ -413,7 +394,6 @@ Scratch memory: `%l0`/`%l4` = `base + 0x2000` where base = `%g2 & 0x0f000000`
 - **Pass:** `%f0`=`0x01234567`, `%f1`=`0xfedcba98` after `ldd …,%f1`.
 - **On failure** (`fpu_sp_op_fail` `0x70003818`): "ERROR  : FPU Single-precision
   Op, exp= %1, obs= %2" (%1 = `%f0` image, %2 = `%f2` image), "Suspect Swift".
-- **Core:** unknown (depends on how the FPU decodes an odd rd for LDDF).
 
 ### 7.3 FPU Single-precision Tests — `post_fpu_single` @ 0x70002770
 
@@ -439,7 +419,6 @@ Scratch memory: `%l0`/`%l4` = `base + 0x2000` where base = `%g2 & 0x0f000000`
   Then each result is stored (`st`) and compared with `fcmps %fN,%f0` / `fbne`.
 - **On failure:** "ERROR  : FPU Single-precision Op, exp= %1, obs= %2"
   (%1 = `0x41c80000`, %2 = result image), "Suspect Swift".
-- **Core:** present (`rtl/cpu/fpu*.vhd`).
 
 ### 7.4 FPU Double-precision Tests — `post_fpu_double` @ 0x700029bc
 
@@ -453,7 +432,6 @@ Scratch memory: `%l0`/`%l4` = `base + 0x2000` where base = `%g2 & 0x0f000000`
   and `%f4`. Compared with `fcmpd`.
 - **On failure** (`fpu_dp_op_fail` `0x70003848`): "ERROR  : FPU Dbl-Precision
   Op, exp= %1 %2, obs= %3 %4" (%1 %2 = `40390000 00000000`), "Suspect Swift".
-- **Core:** present.
 
 ### 7.5 FPU exception (CEXC) tests — `post_fpu_cexc_group` @ 0x700022c0
 
@@ -499,8 +477,6 @@ The V8 trap priorities say `mem_address_not_aligned` (priority 10) beats
 `fp_exception` (11); the "<" tests check exactly that, plus that the pending
 FP exception survives the alignment trap.
 
-- **Core:** unknown for the whole group: needs deferred FP traps with a
-  queue (`std %fq`, FSR.qne), TEM/cexc, and the trap priority above.
 
 `trap_fp_exception` (`0x70001eb0`) stores the FSR to the **absolute** address
 `0x2100` and the FQ to `0x2108` (not base-relative), so these tests need RAM
@@ -569,7 +545,6 @@ which leaves every source masked.
   7. Return %g3 (0x70005350). %g3 is nonzero only if an interrupt handler reported an error.
 - **Pass criteria / expected values:** pending = 0 at entry. After the set, pending = 0x7ffe0000 exactly: no hardware bits (15:1) and no soft-15 bit 31. After the clear, pending = 0. Soft level 15 (bit 31) is never set.
 - **On failure prints:** at `L_700055f4` (0x700055f4): "ERROR  : Address= %1, exp= %2, obs= %3, xor= %4". %1 = register address (%l0, always 0x71e00000 here), %2 = exp (%l1), %3 = obs (%l2), %4 = exp^obs (%l7). Then "UNUMBER: " and "U1507" (0x7000a990). Returns 0xff. The error path does **not** restore PSR (PIL stays 15) and does not mask the system interrupts again.
-- **Core:** present (`rtl/sun4m/ts_inter.vhd:165-185`: CPU0 pending = `softint0 & '0' & hardint0 & '0'`; clear and set work on bits 31:17).
 
 ### 8.3 Soft Interrupts OFF Test — `post_soft_irq_off` @ 0x7000535c
 - **Called:** only by `post_sequencer` at 0x70009acc. Failure goes to `post_fail_cpu_board_leds` (0x70009ad8).
@@ -583,7 +558,6 @@ which leaves every source masked.
 - **Intent vs. actual (ROM bug):** the loop was meant to walk bits 30 down to 17 (soft levels 14→1). The delay-slot instruction at 0x70005440 is `or %g0,%l1,%l4` (word 0xa8100011), which copies %l1 (already 0) into %l4, instead of `mov %l4,%l1`. The actual run is therefore: iteration 1 tests 0x40000000 (level 14 only). Iteration 2 writes and expects 0. Then %l4 = 0 and the loop ends. **Only soft level 14 is exercised.**
 - **Pass criteria / expected values:** pending = 0 and sys-pending = 0 at entry. After set-soft 0x40000000, pending == 0x40000000. After clear, pending == 0.
 - **On failure prints:** same as §8.2 (`L_700055f4`): Address/exp/obs/xor, "U1507", returns 0xff.
-- **Core:** present (`ts_inter.vhd`).
 
 ### 8.4 Soft Interrupts ON Test — `post_soft_irq_on` @ 0x70005498
 - **Called:** only by `post_sequencer` at 0x70009af0, right after the LED command 0x0e,0x08. Failure goes to `post_fail_cpu_board_leds` (0x70009afc).
@@ -597,7 +571,6 @@ which leaves every source masked.
   6. 0x700055a0: restore PSR. Mask set/clear/set 0xf05dff80. Return %g3.
 - **Pass criteria / expected values:** every level traps within 256 poll iterations with tt = 0x10 + level. Pending reads 0 after each handler. %g7 is left at 0x99 on exit and is not cleared.
 - **On failure prints:** a pending mismatch goes to `L_700055f4` (Address/exp/obs/xor, "U1507"). A timeout goes to `L_7000563c`: "ERROR  : No interrupt received, expected %1" with %1 = %g5 (0x00000011..0x0000001f), then "UNUMBER: U1507". Both return 0xff. An interrupt with an unexpected tt goes through `report_async_trap`, which is fatal ("Replace CPU Board").
-- **Core:** present (`ts_inter.vhd` softint0 feeds the IRL encoder).
 
 ### 8.5 PROC0 User Timer Test — `post_proc0_user_timer` @ 0x700065c0
 - **Called:** only by `post_sequencer` at 0x70009b04. Failure goes to `post_fail_cpu_board_leds` (0x70009b10).
@@ -619,7 +592,6 @@ which leaves every source masked.
   - Not counting at `L_70006a48`: "ERROR  : Processor User Timer Not Incrementing" + "U1507".
   - L bit at `L_70006a84`: Address/exp/obs/xor + "U1507". Step 8 passes exp 0x80000000, obs = MSW, "xor" = MSW & ~0x80000000 (an `andn`, 0x700067c8). Step 9 passes exp 0, obs = MSW, xor = MSW.
   - Every path returns 0xff.
-- **Core:** present (`rtl/sun4m/ts_timer.vhd` config 247-252, start/stop 213-219, user-timer MSW/LSW 169-199). Timing dependency: steps 7 and 8 need at least one 500 ns tick between two accesses that are only 5-6 instructions apart. The real machine gets that from slow, uncached boot-PROM fetches (caches are off with the MMU off; microSPARC-II manual, AC bit). A core that fetches PROM instructions faster than about 80 ns each can fail "Not Incrementing" or the L-bit check.
 
 ### 8.6 PROC0 Counter/Timer Test — `post_proc0_counter_timer` @ 0x70006814
 - **Called:** only by `post_sequencer` at 0x70009b18. Failure goes to `post_fail_cpu_board_leds` (0x70009b24).
@@ -642,7 +614,6 @@ which leaves every source masked.
   - `L_70006b44`: mask-set 0xf05dff80, then "ERROR  : No interrupt received, expected %1" with %1 = 0x0000001e, + "U1507".
   - The handler's L-bit errors go to `irq14_limit_bit_error` 0x70002074: "ERROR  : Processor Counter Limit Bit, addr= %1, exp= %2, obs= %3, xor= %4". %1 = 0x71d00004 or 0x71d00000, %2 = 0x80000000 (0 for the third check), %3 = value read, %4 = xor (for the third check, obs & ~0x80000000). Then "UNUMBER: 302  ". It sets %g3 = 1, so the test returns 1.
   - The direct paths return 0xff.
-- **Core:** present (`ts_timer.vhd`: limit write resets the count to UNITE, 0_n008 does not, a limit read clears `p_ov`, `int_p0` feeds hardint 14). Timing dependency: the poll in step 8 is 6 instructions per iteration (0x700069a8-0x700069bc). The interrupt arrives only after about 2.1 s, so each iteration must take ≥ about 4 µs (about 0.67 µs per instruction). Otherwise the test prints "No interrupt received, expected 0000001e" and POST fails with "Replace CPU Board". Steps 4-6 also need ≥ 500 ns between reads that are 5-15 instructions apart.
 
 ### 8.7 System Counter test — none (dead remnants only)
 - **Called:** never. No routine in this ROM tests the system (level-10) counter. The name string "System Counter Test" at 0x7000947e and the message "ERROR  : System Counter Not Incrementing" (0x70008033) have no reference apart from the orphan block below. The byte scan at 0x70000000-0x7003ffff found no `call`, branch or `sethi/or` pair that points at them.
@@ -651,7 +622,6 @@ which leaves every source masked.
   2. 0x70006b94-0x70006be0: a second unlabelled copy of the "No interrupt received, expected %1" (U1507) tail. Nothing branches to it.
   3. `trap_irq10` %g7 = 0x69 path (0x70001988-0x700019f8): mask-set 0xf05dff80. Read system counter 0x71d10004, exp L (bit 31) set. Read system limit 0x71d10000, exp L set. Read again, exp L clear. Write 0 to the limit. Errors go to `irq10_limit_bit_error` 0x7000201c: "ERROR  : System Counter Limit Bit, addr= %1, exp= %2, obs= %3, xor= %4" + "UNUMBER: 302  ". This path is unreachable: the only code that sets %g7 = 0x69 (0x7000698c) sets %g5 = 0x1e, and no code sets %g5 or %g6 = 0x1a together with %g7 = 0x69.
   4. Uncalled helpers that use the system timer: `sys_timer_irq10_arm` 0x7000ab28 (system limit = 0x00080000, which is 0x400 ticks or 512 µs; %g7 = 0x11, %g5 = 0x1a; mask-clear 0xf05dff80; drives the irq10 spinner), `sys_timer_irq10_disarm` 0x7000ab64, and `sys_timer_limit_irq_setup` 0x7000b860 (system limit = 0x30000000, which is 0x180000 ticks or about 0.79 s; %g1 = 8; mask-clear 0x80080000 = MA+T; drives the irq10 LED-blink path at 0x70001aa0).
-- **Core:** present (`ts_timer.vhd:223-245` system limit, counter and limit-no-reset). The POST does not use them, except `post_quiesce_leds_off`, which writes 0 to 0x71d10000.
 
 ## 9. DMA2, LANCE, ESP and parallel-port tests
 
@@ -702,7 +672,6 @@ The sequencer (`post_sequencer` 0x700098c0) calls the tests itself. Its order is
   6. Checkpoints before each step.
 - **Pass criteria / expected values:** as listed.
 - **On failure prints:** `dma2_reg_fail`: Address= always 0x78000000, even for the +1/+2/+3 accesses. exp, obs and xor as listed. Then `UNUMBER: U1102`.
-- **Core:** absent (not decoded; HARDWARE_GAPS "MACIO ID register").
 
 ### 9.2 DMA2 E_CSR Register Test — `post_dma2_e_csr` @ 0x700042ec
 - **Called:** sequencer 0x70009b3c, the first test of the DMA2/LANCE block. Also listed in `post_dma2_misc_group` 0x7000396c, which is never called.
@@ -716,7 +685,6 @@ The sequencer (`post_sequencer` 0x700098c0) calls the tests itself. Its order is
   6. 0x700043ec: `sta 0` → AFSR. 0x700043f4: `sbus_clear_afsr`. Return `%g3`.
 - **Pass criteria / expected values:** 0xa0000080, 0xa0000040, SLAVE_ERR clears, AFAR 0x78400010, AFSR 0x93820000.
 - **On failure prints:** `dma2_reg_fail` (Address 0x78400010) or `dma2_afsr_fail` (Address 0x10001004 or 0x10001000), each followed by `UNUMBER: U1102`. A stuck SLAVE_ERR goes to `dma2_slave_err_stuck_fail`, which restarts the PROM.
-- **Core:** present. `ts_dmaux.vhd:228-235` has ID, RESET, INT_EN and INT; it has no SLAVE_ERR, and byte writes are ignored. The AFSR is absent, so the test would fail at step 3.
 
 ### 9.3 LANCE Address Port Tests — `post_lance_addr_port` @ 0x70005680
 - **Called:** sequencer 0x70009b50. Also listed in `post_dma2_misc_group` 0x70003974, which is never called.
@@ -735,7 +703,6 @@ The sequencer (`post_sequencer` 0x700098c0) calls the tests itself. Its order is
   - RAP mismatch: `L_700058ec`: `ERROR  : Address= %1, exp= %2, obs= %3, xor= %4` with %1=0x78c00002, %2=`%l1`, %3=`%l2`, %4=xor. Then `UNUMBER: U1102`.
   - E_CSR mismatch: `L_70005934` prints %1=`%l3`, %2=`%l6`, %3=`%l5`. None of these are set in this routine, so Address, exp and obs are garbage; only xor is correct (bug). Then `UNUMBER: U1102`.
   - AFSR/AFAR mismatch: `L_7000597c` with %1=`%l0`, %2=`%l1`, %3=`%l2`, then `UNUMBER: U1102`.
-- **Core:** present. `ts_lance.vhs:363-427` has RAP/RDP. The slave-error and AFSR parts are absent.
 
 ### 9.4 LANCE Data Port Tests — `post_lance_data_port` @ 0x70005798
 - **Called:** sequencer 0x70009b64. Also listed in `post_dma2_misc_group` 0x7000397c, which is never called.
@@ -751,7 +718,6 @@ The sequencer (`post_sequencer` 0x700098c0) calls the tests itself. Its order is
   8. 0x700058d8: `sta 0` → AFSR. Return `%g3`.
 - **Pass criteria / expected values:** CSR0 0x0004, CSR1 0xa8a8, E_CSR 0xa0000040, AFAR 0x78c00000, AFSR 0x93820000.
 - **On failure prints:** as in the address-port test. `L_700058ec` for the data values (Address 0x78c00000). `L_70005934` for E_CSR, with the same garbage-register bug. `L_7000597c` for AFSR/AFAR. Each prints `UNUMBER: U1102`.
-- **Core:** present (CSR0/CSR1 through RAP/RDP in `ts_lance.vhs`). The slave-error and AFSR parts are absent.
 
 ### 9.5 DMA2 D_CSR Register Test — `post_dma2_d_csr` @ 0x70003b50
 - **Called:** sequencer 0x70009b78. Also listed in `post_dma2_esp_group` 0x70003994, which is never called.
@@ -766,7 +732,6 @@ The sequencer (`post_sequencer` 0x700098c0) calls the tests itself. Its order is
   7. 0x70003c40: `sta 0` → AFSR. 0x70003c48: `sbus_clear_afsr`. Return `%g3`.
 - **Pass criteria / expected values:** 0xa0000080, then exactly 0xa0000040, AFAR 0x78400000, AFSR 0x93820000.
 - **On failure prints:** `dma2_reg_fail` (Address 0x78400000) or `dma2_afsr_fail`, each followed by `UNUMBER: U1102`. A stuck SLAVE_ERR goes to `dma2_slave_err_stuck_fail` (PROM restart).
-- **Core:** present. `ts_dmaux.vhd:197-205` has ID, RESET, WRITE, EN_DMA, INT_EN and INT. SLAVE_ERR is absent and byte writes are ignored, so the test would fail at step 4.
 
 ### 9.6 DMA2 D_ADDR Register Test — `post_dma2_d_addr` @ 0x70003c5c
 - **Called:** sequencer 0x70009b8c. Also listed in `post_dma2_esp_group` 0x7000399c, which is never called.
@@ -782,7 +747,6 @@ The sequencer (`post_sequencer` 0x700098c0) calls the tests itself. Its order is
   8. 0x70003de0: `sta 0` → AFSR. 0x70003de8: `sbus_clear_afsr`.
 - **Pass criteria / expected values:** as listed.
 - **On failure prints:** `dma2_reg_fail` (Address 0x78400004 or 0x78400000) or `dma2_afsr_fail`, each followed by `UNUMBER: U1102`.
-- **Core:** present. `ts_dmaux.vhd:208-216` has D_ADDR read/write. D_A_LOADED, SLAVE_ERR and the AFSR are absent.
 
 ### 9.7 DMA2 D_BCNT Register Test — `post_dma2_d_bcnt` @ 0x70003dfc
 - **Called:** sequencer 0x70009bb0. Also listed in `post_dma2_esp_group` 0x700039a4, which is never called.
@@ -797,7 +761,6 @@ The sequencer (`post_sequencer` 0x700098c0) calls the tests itself. Its order is
   7. 0x70003f28: `sta 0` → AFSR. 0x70003f30: `sbus_clear_afsr`.
 - **Pass criteria / expected values:** as listed. The test value has bits 31:24 = 0, so the 24-bit limit is not tested.
 - **On failure prints:** `dma2_reg_fail` or `dma2_afsr_fail`, each followed by `UNUMBER: U1102`.
-- **Core:** absent (D_BCNT is a comment only, `ts_dmaux.vhd:218`).
 
 ### 9.8 DMA2 D_NADDR Register Test — `post_dma2_d_naddr` @ 0x70003f44
 - **Called:** sequencer 0x70009bc4. Also listed in `post_dma2_esp_group` 0x700039ac, which is never called.
@@ -812,7 +775,6 @@ The sequencer (`post_sequencer` 0x700098c0) calls the tests itself. Its order is
   7. 0x70004050: `sta 0` → AFSR. 0x70004058: `sbus_clear_afsr`.
 - **Pass criteria / expected values:** as listed.
 - **On failure prints:** `dma2_reg_fail` or `dma2_afsr_fail`, each followed by `UNUMBER: U1102`.
-- **Core:** absent (no D_EN_NEXT or next-address logic in `ts_dmaux.vhd`).
 
 ### 9.9 DMA2 D_NBCNT Register Test — `post_dma2_d_nbcnt` @ 0x7000406c
 - **Called:** never. It is listed only in `post_dma2_esp_group` 0x700039b4, which is never called.
@@ -825,7 +787,6 @@ The sequencer (`post_sequencer` 0x700098c0) calls the tests itself. Its order is
   5. 0x70004154: `dma2_d_clear_slave_err`. 0x7000416c: AFAR must be **0x78400008**. 0x7000418c: AFSR must be **0x93820000**. 0x700041a0: `sta 0` → AFSR. 0x700041a8: `sbus_clear_afsr`.
 - **Pass criteria / expected values:** as listed.
 - **On failure prints:** `dma2_reg_fail` or `dma2_afsr_fail`, each followed by `UNUMBER: U1102`.
-- **Core:** absent.
 
 ### 9.10 FPU Misaligned Reg Pair Test (really the DMA2 D_ chain test) — `post_dma2_d_chain` @ 0x700041bc
 - **Called:** never. It is listed only in `post_dma2_esp_group` 0x700039bc, which is never called.
@@ -840,7 +801,6 @@ The sequencer (`post_sequencer` 0x700098c0) calls the tests itself. Its order is
   7. Return `%g3`. D_CSR is left in chain mode.
 - **Pass criteria / expected values:** as listed.
 - **On failure prints:** `dma2_reg_fail` (Address 0x78400008, 0x78400004 or 0x78400000), then `UNUMBER: U1102`.
-- **Core:** absent.
 
 ### 9.11 ESP Registers Tests — `post_esp_regs` @ 0x70004bc0
 - **Called:** sequencer 0x70009bd8. Also listed in `post_dma2_esp_group` 0x700039c4, which is never called.
@@ -860,7 +820,6 @@ The sequencer (`post_sequencer` 0x700098c0) calls the tests itself. Its order is
      - Third, 0xaa again instead of 0x00: 0x70004e10 `clr %l6` clears the wrong register (bug).
 - **Pass criteria / expected values:** every read equals the byte written. With the bugs above, TC-low sees 0x80/0xaa/0x00 and TC-high sees 0x55/0xaa/0xaa.
 - **On failure prints:** `L_70004e50`: `ERROR  : Address= %1, exp= %2, obs= %3, xor= %4` with %1=register `%l0`, %2=`%l1`, %3=`%l2`, %4=`%l7`. Then `UNUMBER: U1102`.
-- **Core:** present. `ts_esp.vhd:173-282` reads back the current TC, FIFO, command and CR1; fidelity was not audited.
 
 ### 9.12 DMA2 P_CSR Register Test — `post_dma2_p_csr` @ 0x700044a0
 - **Called:** sequencer 0x70009bec.
@@ -876,7 +835,6 @@ The sequencer (`post_sequencer` 0x700098c0) calls the tests itself. Its order is
      Bit names are from [S4M A.II.6.3.2].
 - **Pass criteria / expected values:** `P_CSR & 0x4f` = 0 after a reset.
 - **On failure prints:** `pport_reg_fail`: Address=0x7c800000, exp=inverted bit mask (not a real expected value), obs=P_CSR, xor. Then `UNUMBER: U1102`.
-- **Core:** absent (0x7c800000 not decoded).
 
 ### 9.13 DMA2 P_ADDR Register Test — `post_dma2_p_addr` @ 0x7000455c
 - **Called:** sequencer 0x70009c00.
@@ -887,7 +845,6 @@ The sequencer (`post_sequencer` 0x700098c0) calls the tests itself. Its order is
   3. At 0x7c800004, write and read back: 0xa55a5aa5 (0x700045c8/cc), 0xffffffff (0x700045e0/e4), 0x00000000 (0x700045f8/fc).
 - **Pass criteria / expected values:** every value reads back unchanged.
 - **On failure prints:** `pport_reg_fail` (Address 0x7c800004), then `UNUMBER: U1102`.
-- **Core:** absent.
 
 ### 9.14 DMA2 P_BCNT Register Test — `post_dma2_p_bcnt` @ 0x7000461c
 - **Called:** sequencer 0x70009c14.
@@ -901,7 +858,6 @@ The sequencer (`post_sequencer` 0x700098c0) calls the tests itself. Its order is
      - 0x700046c8: write 0, expect **0**.
 - **Pass criteria / expected values:** as listed.
 - **On failure prints:** `pport_reg_fail` (Address 0x7c800008), then `UNUMBER: U1102`.
-- **Core:** absent.
 
 ### 9.15 PPORT Registers Tests — `post_pport_regs` @ 0x700046ec
 - **Called:** sequencer 0x70009c28, the last I/O test before NVRAM and TOD.
@@ -914,7 +870,6 @@ The sequencer (`post_sequencer` 0x700098c0) calls the tests itself. Its order is
   5. 0x70004794: byte read of TCR 0x7c800015. Bit 3 (0x08, DIR [S4M]) must be **set**.
 - **Pass criteria / expected values:** HCR 0, OCR 0x200a, `TCR & 0x08` ≠ 0.
 - **On failure prints:** `pport_reg_fail` (Address=register, exp=0 / 0x200a / 0x08, obs, xor), then `UNUMBER: U1102`.
-- **Core:** absent.
 
 ### 9.16 DMA2 PPORT Slave Error Tests — `post_dma2_pport_slave_err` @ 0x700047b4
 - **Called:** never. It has no caller at all, not even a group.
@@ -943,7 +898,6 @@ The sequencer (`post_sequencer` 0x700098c0) calls the tests itself. Its order is
   11. 0x700049bc-0x700049c4: 0xf05dff80 → mask set, clear, set (ends masked). 0x700049c8: `sbus_clear_afsr`. Return `%g3`.
 - **Pass criteria / expected values:** one level-15 interrupt within 0x100 loop passes for each byte store. SLAVE_ERR set, then cleared by W1C. AFAR = the store address. AFSR = 0x93820000.
 - **On failure prints:** `pport_no_irq_fail` (`No interrupt received, expected 0000001f`), `pport_reg_fail` (Address 0x7c800000, exp 0x40) or `pport_afsr_fail`, each followed by `UNUMBER: U1102`.
-- **Core:** absent (no BPP, no AFSR, no level-15 source).
 
 ### 9.17 DMA2 PPORT IO Loopback Test — `post_dma2_pport_io_loopback` @ 0x700049dc
 - **Called:** never (no caller).
@@ -959,7 +913,6 @@ The sequencer (`post_sequencer` 0x700098c0) calls the tests itself. Its order is
   4. The cleanup at 0x70004a58 (`stba 0,[0x7c800017]`) is unreachable.
 - **Pass criteria / expected values:** none reachable.
 - **On failure prints:** `pport_reg_fail`: Address=0x7c800016, exp=`%l3` (the value read), obs=stale `%l4`, xor=`%l2^%l3`. Then `UNUMBER: U1102`.
-- **Core:** absent.
 
 ### 9.18 DMA2 PPORT XFR Loopback Test — `post_dma2_pport_xfr_loopback` @ 0x70004a6c
 - **Called:** never (no caller).
@@ -973,7 +926,6 @@ The sequencer (`post_sequencer` 0x700098c0) calls the tests itself. Its order is
   4. 0x70004ae0: `stba %g0,[%l1]` with `%l1`=0x400. This writes a 0 byte to **RAM PA 0x00000400** instead of clearing OCR (bug). The OCR stays in diagnostic mode.
 - **Pass criteria / expected values:** TCR reads 0x00 after 0x00 is written.
 - **On failure prints:** `pport_reg_fail` (Address 0x7c800015), then `UNUMBER: U1102`.
-- **Core:** absent.
 
 ## 10. NVRAM and TOD tests
 
@@ -986,7 +938,6 @@ The sequencer (`post_sequencer` 0x700098c0) calls the tests itself. Its order is
   3. Return %g3 (cleared at 0x70006c24).
 - **Pass criteria / expected values:** each read equals the byte just written. The byte is **not restored** and is left as 0x00.
 - **On failure prints:** a first-check failure goes to `L_70006e54`: "ERROR  : NVRAM (%1) Battery Failure, exp = %2, obs = %3, xor = %4". %1 = 0x71200003, %2 = ~original & 0xff, %3 = read, %4 = xor. Pattern failures go to `L_70006e9c`: "ERROR  : Address= %1, exp= %2, obs= %3, xor= %4". Both then print "UNUMBER: U1506" (0x7000a998) and return 0xff. The sequencer then lights the NVRAM LED and prints "Power-On Selftest FAILED ... Replace NVRAM".
-- **Core:** present (`rtl/sun4m/iram_rtc.vhd`, an 8 KB block RAM behind `ts_rtc.vhd`).
 
 ### 10.2 TOD Registers Test — `post_tod_regs` @ 0x70006cf8
 - **Called:** only by `post_sequencer` at 0x70009c60. Failure goes to `post_fail_nvram` (0x70009c6c).
@@ -1004,7 +955,6 @@ The sequencer (`post_sequencer` 0x700098c0) calls the tests itself. Its order is
 - **On failure prints:** `L_70006e9c`: "ERROR  : Address= %1, exp= %2, obs= %3, xor= %4" (%1 = register address, %2 = value written, %3 = read, %4 = xor) + "UNUMBER: U1506", returns 0xff. On failure the TOD is **not restored**: control is left at 0x80 (clock halted) with test values in the registers.
 - **Side effects on success:** the saved control byte was read after writing 0x40, so the value restored is 0x40. R stays set after POST and the original calibration and sign bits are lost. The time is restored from the snapshot, so the time spent in the test is lost.
 - **Unreached TOD oscillator code:** 0x70006ee4-0x70006f28 prints "ERROR  : Unable to Kickstart TOD Oscillator " (0x700084b4; the string has no %n, but %o1-%o4 = %l2, %l1, %l3, %l7 are loaded anyway) + "U1506" and returns 0xff. 0x70006f2c-0x70006f70 prints Address/exp/obs/xor with %l4/%l3/%l6/%l7 + "U1506". Neither has any reference. The title "TOD Oscillator Test" (0x700093fe) is unreferenced too. They are remnants of a removed oscillator test.
-- **Core:** present (`rtl/sun4m/ts_rtc.vhd`: `mem_s/i/h/j/d/m/y` widths 7/7/6/3/6/5/8 match the 0x70006e4c masks). Possible issue: in `Sync_HTR`, `IF cr='0' THEN mem_* <= cpt_*` and `IF cw='1' THEN cpt_* <= mem_*` are both active when W = 1 and R = 0. That is exactly the 0x80 state this test uses. A written value can then swap between mem and cpt on every clock, and readback depends on clock parity (unverified; worth a simulation). A candidate fix is to gate the mem←cpt copy with `cw='0'`.
 
 ## 11. Shared routines
 
@@ -1039,7 +989,6 @@ The sequencer (`post_sequencer` 0x700098c0) calls the tests itself. Its order is
   March notation: ⇑(w0); ⇑(r0,w1); ⇓(r1); ⇑(r1,w0); ⇓(r0); ⇓(r0,wA); ⇑(rA); ⇓(rA,w5); ⇑(r5); ⇑(r5,wA,w5); ⇓(r5); ⇓(r5,wA,w5,wA); ⇑(rA); ⇑(w1); ⇑(r1,w0,w1); ⇓(r1); ⇓(r1,w0,w1,w0); ⇑(r0). The memory is left all 0.
 - **Pass criteria:** every masked read matches. Returns %g3, which is cleared at 0x70009f14 and is 0 unless a trap handler set it.
 - **On failure prints:** `report_nta_error` 0x7000a6e8: "ERROR  : Address= %1, exp= %2, obs= %3, xor= %4". %1 = address (%l4), %2 = exp & mask, %3 = obs & mask, %4 = xor. If %i5 ≠ 0, `print_simm_unumber(address)` follows. Returns 0xff. Other routines (0x70004f6c, 0x7000513c) also branch into `report_nta_error`.
-- **Core:** unknown (depends on each ASI target: cache data/tag ASIs 0xc-0xf, TLB diagnostic ASI 6).
 
 ### 11.2 Keyboard / LED protocol used by POST
 - **Z85C30 keyboard channel A:** control 0x71000004, data 0x71000006, 1200 baud (`escc_init_kbd` 0x7000a8dc uses the table at 0x7000a95c: WR9 0xc0 reset, WR4 0x46, WR3 0xc0, WR5 0xe2, WR9 0x02, WR11 0x55, WR12 0x7e, WR13 0, WR14 0x82, WR3 0xc1, WR5 0xea, WR14 0x83, WR0 0x10 twice; WR9 MIE = 0, so no ESCC interrupts). RR0 bit 0 = Rx available, RR0 bit 2 = Tx empty. After writing 1 to the control register, the next read is RR1, whose bit 0 = All Sent.
@@ -1104,7 +1053,6 @@ The sequencer (`post_sequencer` 0x700098c0) calls the tests itself. Its order is
   5. Else if %l7 = 0 (no keyboard): POST with %g4 &= ~2 (quiet; matches the manual's "keyboard disconnected and diag-switch? false").
   6. Else `post_exit_soft_reset(-1)` (skip).
   - `escc_init_kbd` has just reset the channel, so step 1 only sees bytes that arrive in a window of a few ms. The L1-D case is really handled by step 4, because reset_power_on already set diag-switch?.
-- **Core:** present (`rtl/sun4m/ts_sunkb.vhd`: 0x01 → FF 04 7F, 0x0F → FE <layout>, 0x0E <v> is latched). So `kbd_detect` returns 4 (set A LEDs) unless the OSD layout byte is 9. The keyboard LEDs are not forwarded to MiSTer (`docs/HARDWARE_GAPS.md` §6, `ss_core.vhd:819-820`). There is no Stop (0x01) key, so L1 and L1-D cannot be entered; only diag-switch? in NVRAM can force POST.
 
 ## 12. Test names without code
 
@@ -1235,7 +1183,7 @@ Found while reading the code; none of them matter on a real SS5 that passes.
 
 ## 15. Candidate CPU test suite
 
-Goal (REWORK.md step 1f): a standalone bare-metal suite under `tests/cpu/`
+Goal: a standalone bare-metal suite under `tests/cpu/`
 that runs from a tiny boot stub, reports over the Zilog serial port and gives
 the same answer in simulation and on the board. The POST provides the
 expectations for the microSPARC-II-specific parts. The tests should be
@@ -1268,22 +1216,22 @@ copied out of the Sun image.
 
 ### Tests that can be lifted from the POST
 
-| Suite test | From | Needs from the platform | Core today | Notes |
-|---|---|---|---|---|
-| `mmu_ctpr`, `mmu_ctx` | MMU Context Table / Context Register tests | ASI 4 only | present | masks `0x00ffffc0`, `0xff` |
-| `mmu_tlbrc`, `mmu_sfsr_diag`, `mmu_sfar_diag` | TLB Replace Ctrl / Sync Fault Stat / Addr tests | ASI 4 VA `0x1000`, `0x1300`, `0x1400` | **absent** (VA[12] ignored: these alias PCR/SFSR/SFAR) | microSPARC-II-specific; run `mmu_tlbrc` **after** a check that VA `0x1000` does not alias the PCR, otherwise the test turns the MMU on |
-| `tlb_ram`, `tlb_cam`, `tlb_lcam` | MMU TLB RAM / CAM / LCAM NTA | ASI 6 | **absent** (ignored) | the POST stops here on the core and on QEMU; decide between implementing ASI 6 and accepting the failure |
-| `dcache_data`, `dcache_tag`, `icache_data`, `icache_tag` | D/I-Cache RAM/TAG NTA | ASI 0xc-0xf, caches off | data: absent; tags: unknown | masks `0xffffefff` (D tag), `0xffffcfff` (I tag) |
-| `fpu_regfile` | FPU Register File Test | FPU, RAM | present | four 64-bit patterns × 16 pairs |
-| `fpu_lddf_odd_rd` | FPU Misaligned Reg Pair | FPU, RAM | unknown | `ldd [x],%f1` must load f0/f1 |
-| `fpu_sp_ops`, `fpu_dp_ops` | FPU Single / Double-precision | FPU, RAM | present | all results 25.0 |
-| `fpu_cexc_{nv,of,dz,nx}_{sp,dp}` | the eight CEXC tests | FPU, fp_exception handler | unknown | TEM = 0x1f; deferred trap on the next FP store; store blocked; cexc bit |
-| `fpu_cexc_uf_{sp,dp}` | the two unused Underflow tests | same | unknown | not run by the POST, still worth running |
-| `fpu_trap_prio_{sp,dp}_{gt,lt}` | Trap Priority > / < | FPU, alignment + fp handlers | unknown | QEMU fails `<` (its FP traps are precise, taken at the FPop): exactly the behaviour this test pins down |
-| `irq_proc0_regs`, `softint_off`, `softint_on` | PROC0 Interrupt Regs, Soft Interrupts OFF/ON | interrupt controller `0x71e00000`/`0x71e10000` | see post-tests | platform, not CPU, but needed for any trap test |
-| `utimer`, `ctimer` | PROC0 User Timer, Counter/Timer | counters `0x71d00000`/`0x71d10000`, level-14 interrupt | see post-tests | QEMU fails both |
-| `mem_march` | Memory Address Pattern Test / `mem_march_test` | RAM | present | useful as the suite's own RAM check |
-| `boot_handoff` | `post_exit_soft_reset` + `reset_entry` | system control `0x71f00000` bit 0/1 | see hardware-access | globals must survive SW_RST; QEMU loses them |
+| Suite test | From | Needs from the platform | Notes |
+|---|---|---|---|
+| `mmu_ctpr`, `mmu_ctx` | MMU Context Table / Context Register tests | ASI 4 only | masks `0x00ffffc0`, `0xff` |
+| `mmu_tlbrc`, `mmu_sfsr_diag`, `mmu_sfar_diag` | TLB Replace Ctrl / Sync Fault Stat / Addr tests | ASI 4 VA `0x1000`, `0x1300`, `0x1400` | microSPARC-II-specific; run `mmu_tlbrc` **after** a check that VA `0x1000` does not alias the PCR, otherwise the test turns the MMU on |
+| `tlb_ram`, `tlb_cam`, `tlb_lcam` | MMU TLB RAM / CAM / LCAM NTA | ASI 6 | the POST stops here on QEMU (no TLB diagnostic ASI); decide between implementing ASI 6 and accepting the failure |
+| `dcache_data`, `dcache_tag`, `icache_data`, `icache_tag` | D/I-Cache RAM/TAG NTA | ASI 0xc-0xf, caches off | masks `0xffffefff` (D tag), `0xffffcfff` (I tag) |
+| `fpu_regfile` | FPU Register File Test | FPU, RAM | four 64-bit patterns × 16 pairs |
+| `fpu_lddf_odd_rd` | FPU Misaligned Reg Pair | FPU, RAM | `ldd [x],%f1` must load f0/f1 |
+| `fpu_sp_ops`, `fpu_dp_ops` | FPU Single / Double-precision | FPU, RAM | all results 25.0 |
+| `fpu_cexc_{nv,of,dz,nx}_{sp,dp}` | the eight CEXC tests | FPU, fp_exception handler | TEM = 0x1f; deferred trap on the next FP store; store blocked; cexc bit |
+| `fpu_cexc_uf_{sp,dp}` | the two unused Underflow tests | same | not run by the POST, still worth running |
+| `fpu_trap_prio_{sp,dp}_{gt,lt}` | Trap Priority > / < | FPU, alignment + fp handlers | QEMU fails `<` (its FP traps are precise, taken at the FPop): exactly the behaviour this test pins down |
+| `irq_proc0_regs`, `softint_off`, `softint_on` | PROC0 Interrupt Regs, Soft Interrupts OFF/ON | interrupt controller `0x71e00000`/`0x71e10000` | platform, not CPU, but needed for any trap test |
+| `utimer`, `ctimer` | PROC0 User Timer, Counter/Timer | counters `0x71d00000`/`0x71d10000`, level-14 interrupt | QEMU fails both |
+| `mem_march` | Memory Address Pattern Test / `mem_march_test` | RAM | useful as the suite's own RAM check |
+| `boot_handoff` | `post_exit_soft_reset` + `reset_entry` | system control `0x71f00000` bit 0/1 | globals must survive SW_RST; QEMU loses them |
 
 The interrupt and timer tests depend on the Slavio interrupt controller and
 counters, not on the CPU; they belong in the suite because every trap test

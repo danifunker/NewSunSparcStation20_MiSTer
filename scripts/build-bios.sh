@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# build-bios.sh - build OpenBIOS (bios/, the TACUS sparc32 target) into
+# build-bios.sh - build OpenBIOS (bios/, its tacus-sparc32 target) into
 # bios/build/boot.rom.
 #
 # Needs a SPARC cross compiler and xsltproc:

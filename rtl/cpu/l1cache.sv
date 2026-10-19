@@ -314,7 +314,7 @@ module l1cache
     sq_pushes = {1'b0, sq_push} + {1'b0, sq_push2};
   end
   // Hold at 10 of 16: the hold reaches the interconnect through registers
-  // (the hybrid: two), so a few snoops are still on their way, and the
+  // (two), so a few snoops are still on their way, and the
   // module's own flush ASIs may push invalidations meanwhile.
   assign snoop_hold_o = sq_count >= 5'd10;
 

@@ -9,10 +9,9 @@
 > `obpforth.py`, `detok.py`). Keep the output out of git (the full set is in the gitignored `scratch/private/rom-disassembly/`). The links to
 > those files below assume you have done that.
 
-A complete disassembly of the two Sun OpenBoot PROMs that match what this
-core implements. It is phase 1 of [../REWORK.md](../legacy/REWORK.md). The core is
-to boot these PROMs instead of OpenBIOS (REWORK phase 5.1), so this is the
-reference for what the hardware must do: every register the PROMs touch,
+A complete disassembly of the two Sun OpenBoot PROMs that match the machines
+this core models. It is the reference for what the hardware must do to boot
+them: every register the PROMs touch,
 every self-test and its expected values, and the device tree they build.
 
 | Folder | Image | Machine / CPU | Firmware |
@@ -31,7 +30,7 @@ Each ROM folder has:
 | File | What |
 |---|---|
 | `README.md` | image map, how the ROM is entered, instruction-level reset flow, trap handling, POST output and hand-off to OBP (SS20: CPU detection, MP start-up), open items |
-| `post-tests.md` | every POST self-test: entry, algorithm, registers/ASIs touched, expected values, messages; a one-word core verdict; a candidate CPU test-suite section |
+| `post-tests.md` | every POST self-test: entry, algorithm, registers/ASIs touched, expected values, messages; a candidate CPU test-suite section |
 | `hardware-access.md` | every physical address and ASI the machine code touches, grouped by device |
 | `device-tree.md` | the device tree the PROM builds, from the decompiled Forth; the Forth-level self-tests |
 | `listing.s` | the full annotated listing: machine code, data, strings, and the Forth dictionary printed as 16-bit token cells |

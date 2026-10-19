@@ -13,8 +13,7 @@
 //   Linux sound/sparc/cs4231.c; QEMU hw/audio/cs4231.c (a register stub:
 //   the 0x40-byte window, I12 = 0x8A, I25 = 0xA0); OpenBIOS
 //   drivers/sbus.c ob_cs4231_init (regs at slot offset 0x0C000000, 0x40
-//   bytes, SBus level 5); docs/legacy/impl-gaps/video-audio-glue.md A1-A14
-//   (what the drivers were seen to need).
+//   bytes, SBus level 5).
 //
 // The slot (iob addr = offset in slot 3; every access acks, never err):
 //   0x0000000-0x00007FF  FCode PROM (cs4231_fcode, tools/fcode_cs4231.py)

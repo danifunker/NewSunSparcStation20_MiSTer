@@ -8,7 +8,7 @@
 
 Times are printed in cycles (the harness dumps cycle C at 2C+1 and 2C+2);
 values in hex. REGEX is matched against the dotted hierarchical name
-(TOP.sim_top.ss_core.i_ts_core....).
+(TOP.sim_top.machine....).
 """
 import re
 import sys

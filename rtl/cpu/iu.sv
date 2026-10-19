@@ -450,8 +450,8 @@ module iu
   // cache miss, a table walk, a slow bus). D must wait for that too: an
   // instruction in E re-latches its operands every cycle, but a JMPL/RETT
   // uses its target in E at once to redirect the fetch, and the forwarding
-  // path only has the load's value once it is acked. (OpenBIOS on the
-  // hybrid: ld [%g1+0x240],%g1; jmpl %g1 — the jump took the old %g1.)
+  // path only has the load's value once it is acked. (OpenBIOS:
+  // ld [%g1+0x240],%g1; jmpl %g1 — without the wait the jump took the old %g1.)
   /* verilator lint_off UNUSEDSIGNAL */
   function automatic logic d_uses_rd_of(input dec_t ld, input logic dbl);
     logic u;

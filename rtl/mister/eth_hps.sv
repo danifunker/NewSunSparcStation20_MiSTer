@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 //
 // eth_hps: the LANCE's MAC, bridged to Main through a frame mailbox in DDR3.
-// SystemVerilog port of rtl/mister/eth_hps.vhd (ours); design notes in
-// docs/legacy/design/ethernet-hps.md (which still describes SSETH001: the
-// RX ring is 16 slots since SSETH002).
+// The mailbox protocol is SSETH002 (an 8-slot TX ring, a 16-slot RX ring).
 //
 // The LANCE (phase 8) keeps its descriptor rings and its DMA through the
 // IOMMU; this is the "wire" behind it. Frames go to Main (support/sun,
@@ -60,7 +58,7 @@
 // the 4 FCS bytes counted; nothing goes to the mailbox, and the network is
 // not polled meanwhile.
 //
-// The LANCE side (the old ts_pack MAC records, as plain ports):
+// The LANCE side (plain ports):
 //  TX (mac_emi_w/r):
 //   tx_push   a 16-bit word this cycle; always taken unless a frame is
 //             complete and waiting (tx_busy covers that: the LANCE starts a
@@ -97,12 +95,8 @@
 // not polled (the mailbox is still initialised and the MAC published).
 // `rst` is synchronous; a reset starts the mailbox again (a new GEN).
 //
-// Differences from the VHDL, all harmless:
-//  - rx_d is valid in the first cycle of rx_fifordy (the VHDL's buffer read
-//    address caught up one cycle after an offer, so a pop in that very
-//    cycle would have taken a stale word; its LANCE never popped that soon);
-//  - a looped-back frame longer than a slot is dropped like a transmitted
-//    one (the VHDL wrapped its buffer index on such a frame).
+// rx_d is valid in the first cycle of rx_fifordy; a looped-back frame
+// longer than a slot is dropped like a transmitted one.
 
 module eth_hps #(
   parameter int CLK_HZ = 55_000_000,

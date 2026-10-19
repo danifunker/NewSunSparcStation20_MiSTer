@@ -7,8 +7,7 @@ separately) the machine-code words of the Forth kernel that QEMU executed.
 Generated from [`listing.s`](listing.s)'s analysis (every load/store whose
 address the constant tracker resolves), then annotated by hand; addresses
 computed at run time (loops, per-CPU offsets) are described in §2. This is
-the list to diff against the core's address decoder (`rtl/sun4m/ts_decode.vhd`)
-and ASI decoder (`rtl/cpu/asi_pack.vhd`).
+the list to diff against the core's address and ASI decoders.
 
 Conventions: physical addresses are 36-bit, `0xS_HHHH_LLLL` with S =
 PA[35:32] (bypass ASI 0x20 → S = 0, 0x2e → 0xe, 0x2f → 0xf). Width in bits;
@@ -419,26 +418,25 @@ at `0x52d10`, `0x52ff0`, `0x532e8`, `0x535e8`) covering ASIs
 0x02, 0x03, 0x04, 0x10, 0x11, 0x12, 0x13, 0x14, 0x20, 0x2e, 0x2f, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c; the addresses there are
 chosen by Forth code (see `forth-dictionary.txt`).
 
-## 4. For the core's decoder
+## 4. Devices easy to miss
 
-Devices the machine code touches that `rtl/sun4m/ts_decode.vhd` /
-`ts_iommu.vhd` do not decode (quick check, not an audit):
+Devices the machine code touches beyond the usual sun4m set (quick check, not
+an audit):
 
 - EMC/SMC memory controller, pa `0xf_0000_0000-0x1f` (reads return
   0xBADACCE5): used by the reset path (`rom-cold-code` delay register), the
   SIMM probe (VCR) and every ECC test.
 - MSI M-to-S registers: AFSR/AFAR (`0xf_e000_1000/1004`), arbiter enable
   (`0xf_e000_1008`), slot configuration (`0xf_e000_1010-101c`), MID register
-  (`0xf_e000_2000`): `ts_iommu.vhd` returns 0 for everything but control, base,
-  flush and 0x3018. The MID register reading 0 makes every CPU identify as
+  (`0xf_e000_2000`). A MID register reading 0 makes every CPU identify as
   MID 8 (README §5, post-tests §11.2).
 - IOMMU diagnostic windows (`0x100`, `0x200`) and comparator (`0x140/0x150`).
 - MACIO ID register `0xe_f000_0000` and the parallel port `0xe_f480_0000`.
 - VSIMM/MDI control space `0x0_9x00_0000` (probed by the SIMM probe and
   `rom-cold-code`; reads must not hang).
-- CPU side: MXCC ASI 2 (the core reports MB = 1, so only the SuperSPARC-II
+- CPU side: MXCC ASI 2 (with MB = 1 only the SuperSPARC-II
   banner path touches it), TLB diagnostic ASIs 5/6, cache diagnostic ASIs
   0x0c-0x0f and flash clear 0x36/0x37, store-buffer ASIs 0x30/0x32, ASI 0x38 as
-  a data register (the core uses 0x38/0x39 internally for table walks), ACTION
+  a data register, ACTION
   ASI 0x4c.
 

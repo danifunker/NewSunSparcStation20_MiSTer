@@ -1,7 +1,6 @@
-// Pipelined masters, as plomb_avalon64 behaves (written during the phase 4
-// audit, docs/impl-gaps/video-audio-glue.md 2.2). With the pipelined arbiter
-// the slave now sees overlapping reads; that is expected, not an error.
-// Pipelined masters (like plomb_avalon64): a new command may be presented
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Pipelined masters (Avalon bridges): a new command may be presented
 // right after the previous one is accepted, before its read data returns;
 // requests may also be withdrawn before acceptance. Checks per-master data
 // order against a shadow copy and that the slave never sees overlapping reads.

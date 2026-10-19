@@ -9,8 +9,8 @@
 # `sh ub.sh run N [TESTS]` and a clean halt. The score is computed from the
 # capture by tools/unixbench/ubscore.py (index 10.0 = a SPARCstation 20-61).
 #
-#   --core NAME   the rbf core_start loads (default SunSparcStation20; e.g. the
-#                 VHDL core's release copied under another name)
+#   --core NAME   the rbf core_start loads (default SunSparcStation20; e.g. an
+#                 older release copied under another name)
 #   --rom FILE    a boot ROM for this run (default: the board's openbios.rom)
 #   --copies N    parallel copies (UnixBench -c N), default 1
 #   --nvram NAME  an NVRAM image in the games folder (with --rom = Sun's

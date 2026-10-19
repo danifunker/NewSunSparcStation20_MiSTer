@@ -1,7 +1,6 @@
-/* The second-level TLB (mcu_tw.vhd, MCNTL bit 6 with the OSD option; the
+/* The second-level TLB (MCNTL bit 6 with the OSD option; the
  * simulation's --l2tlb) must be invisible: a correct OS cannot tell it
- * from a larger TLB. Three ways it could show (audit CFG-1, open
- * question 2), each a test here; without the option the tests pass
+ * from a larger TLB. Three ways it could show (CFG-1), each a test here; without the option the tests pass
  * trivially, and QEMU, which has no bit 6, passes them as a reference.
  *   - a write through the TLB diagnostic ASI 6 (NeXTSTEP's suspected
  *     way of invalidating entries) drops the TLBs and the L2 TLB: a PTE

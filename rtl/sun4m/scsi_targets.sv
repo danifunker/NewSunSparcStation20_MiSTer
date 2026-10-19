@@ -2,10 +2,7 @@
 //
 // scsi_targets: the SCSI target engine behind the ESP -- two disks and a
 // CD-ROM served from the MiSTer's SD image slots through hps_io's block
-// interface. A SystemVerilog port of our rtl/sun4m/scsi_targets.vhd (kept
-// for the old core): the same states, the same ports' semantics and, cycle
-// for cycle, the same behaviour (see "Differences" at the end of this
-// header, and the one deliberate fix there).
+// interface.
 //
 // One engine serves every target: the ESP has one nexus at a time. Blocks
 // move to and from hps_io in chunks of up to 32 (16 KB, hps_io's
@@ -44,8 +41,8 @@
 // Main) the disc is one data track and the audio commands are rejected.
 //
 // ---------------------------------------------------------------------------
-// The ESP side: the old core's record bus, flattened (the ESP of phase 7 is
-// written against this; docs/legacy/design/scsi-hps.md §3.3). It is not the
+// The ESP side: a flat request/response bus (rtl/sun4m/esp.sv is written
+// against this). It is not the
 // SCSI cable: there is no arbitration, no reselection and no parity; one
 // clock (clk) for both sides.
 //
@@ -90,8 +87,7 @@
 //                   takes it then, and raises req again only after that.
 //   esp_rst_i       SCSI bus reset: every target back to idle, UNIT
 //                   ATTENTION 29h pending, the CD player stopped.
-//   tgt_pc_o[9:0]   debug: the engine's state number (the VHDL's d_pc, the
-//                   same numbering), for a bus tracer.
+//   tgt_pc_o[9:0]   debug: the engine's state number, for a bus tracer.
 //
 // The hps_io side (hps_io WIDE = 1: 16-bit words, byte 2w low, 2w+1 high;
 // 512-byte blocks). One request at a time, for one slot:
@@ -104,8 +100,7 @@
 //                   sd_buff_addr_i counting through the whole chunk
 //                   (13 bits: up to 32 blocks of 256 words);
 //   sd_buff_dout_i  a word from Main (reads), written on sd_buff_wr_i;
-//   sd_buff_wr_i    per slot: hps_io's sd_buff_wr AND sd_ack[n] (the VHDL's
-//                   hdb_wr);
+//   sd_buff_wr_i    per slot: hps_io's sd_buff_wr AND sd_ack[n];
 //   sd_buff_din_o   the word at sd_buff_addr_i for Main (writes): the data
 //                   follows the address one clock later (a block RAM read);
 //                   shared by the slots.
@@ -114,23 +109,12 @@
 //                   img_readonly_i. Mounts are not reset: they outlive the
 //                   machine's resets, as the slots do. The CD is read-only.
 //
-// Differences from the VHDL (none functional):
-//   - the ports are plain vectors (the VHDL's type_scsi_w/r records, the
-//     hdb_* names); sd_buff_wr_i is the VHDL's hdb_wr;
-//   - power-up values the VHDL gave in declarations come from an initial
-//     block; registers the VHDL left uninitialised power up as 0 (so does
-//     the FPGA);
-//   - the RAMs are block-RAM templates (rtl/lib/ram_tdp8 for the 32 KB
-//     buffer's two byte lanes; simple dual-port arrays for the track table,
-//     its entries and the audio ring) instead of VHDL shared variables;
-//     their read-during-write and latency are the same where they are used;
-//   - xfer_wr, which the VHDL set but never read, is gone.
-// One deliberate difference: when a block request completes, the blocks
-// still to fetch or store (h_left) count down saturating at 0. The VHDL
-// subtracted plainly, so an abort (ATN, a change of did, a bus reset) that
-// cleared the count while a request was in flight wrapped it to ~2^32 and
-// the hps side went on reading blocks past the transfer until the next
-// command. Transfers that are not aborted are unchanged.
+// The RAMs are block-RAM templates (rtl/lib/ram_tdp8 for the 32 KB
+// buffer's two byte lanes; simple dual-port arrays for the track table, its
+// entries and the audio ring). When a block request completes, the blocks
+// still to fetch or store (h_left) count down saturating at 0, so an abort
+// (ATN, a change of did, a bus reset) that clears the count while a request
+// is in flight ends the transfer.
 // ---------------------------------------------------------------------------
 
 module scsi_targets #(
@@ -212,7 +196,7 @@ module scsi_targets #(
   localparam logic [4*8-1:0]  REV     = "1.0 ";
   localparam logic [7*8-1:0]  SERIAL  = "MISTER0";
 
-  // The engine's states, numbered as the VHDL's (tgt_pc_o)
+  // The engine's states (numbered: tgt_pc_o)
   typedef enum logic [4:0] {
     S_IDLE, S_SETTLE, S_MSGOUT, S_MSGIN_REPLY, S_CMD, S_EXEC,
     S_TOCDIV, S_FILL, S_DIN, S_DOUT, S_DOUT_END, S_RD_WAIT,
@@ -484,7 +468,7 @@ module scsi_targets #(
   logic        b_we;
   logic [7:0]  b_dre, b_dro;
 
-  // Power-up values (the VHDL's declaration initialisers): the mounts and
+  // Power-up values: the mounts and
   // the player, which no reset touches before their first use.
   initial begin
     mnt_d     = 3'b000;
@@ -1800,8 +1784,8 @@ module scsi_targets #(
             h_half <= !h_half;
             h_lba  <= h_lba + {26'd0, h_cnt};
             // Saturating: an abort (ATN, a change of did, a bus reset) clears
-            // h_left while a request is in flight; the VHDL's plain
-            // subtraction then wrapped and the hps side kept fetching.
+            // h_left while a request is in flight; a plain subtraction
+            // would wrap and the hps side would keep fetching.
             h_left <= (h_left > {26'd0, h_cnt}) ? h_left - {26'd0, h_cnt} : 32'd0;
           end
           hst <= H_IDLE;

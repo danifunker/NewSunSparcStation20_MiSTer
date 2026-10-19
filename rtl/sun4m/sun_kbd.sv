@@ -8,7 +8,7 @@
 //   keyboard's replies); the Type 4/5 layouts in MAME's sunkbd/hlekbd.cpp
 //   (comment block; the Type 5 PC layout is the one used here) and its
 //   command/reply behaviour; QEMU hw/char/escc.c (reset/layout replies);
-//   docs/legacy/PLAN.md B2 for the PC-keyboard chords. The PS/2 set 2 ->
+//   the PC-keyboard chords (Right Alt + F keys as L-keys) are our own. The PS/2 set 2 ->
 //   Sun table below is written new.
 //
 // Host -> keyboard (byte taps of the ESCC, tx_*): 01 reset (clears the

@@ -1,6 +1,6 @@
 # SPARCstation 10/20 boot PROM (OBP 2.25, 525-1377-08) — machine-code side
 
-Phase 1 of [`docs/REWORK.md`](../../legacy/REWORK.md). This folder documents the
+This folder documents the
 SPARCstation 10/20 OpenBoot PROM that the core's SS20 build is meant to run:
 its image map, how a SuperSPARC enters it, the reset flow up to the first
 Forth word, multiprocessor start-up, trap handling and the power-on self-test
@@ -276,18 +276,14 @@ clear-pending register (pa `0xf_f140_n004`), keep the context register, then
 0x1ff1 with 1 (no MXCC) or 2 (MXCC); `post_main` refuses a mix (value 3:
 "TMS390Z55 and TMS390Z50 Modules can NOT be mixed").
 
-The core's SS20 configuration (`rtl/cpu/cpu_conf_pack.vhd`, `CONF_SuperSparc`)
-reports PSR impl/ver 0x40 and MMU impl/ver 0x01, and MCNTL.MB reads 1: the ROM
-will call it type 0x40 without MXCC ("TMS390Z50(3.x) 0Mb External cache") and
-skip the MXCC and SuperSPARC-II suites. Its IOMMU reports IMPL 0
-(`IOMMU_VER => x"04"`), so the reset path takes the MID from the CPU — for a
-no-MXCC SuperSPARC that is ASI 0x38 va 0, which `reset_entry` loaded from the
-MSI MID register — and POST's `get_mid` reads the MSI MID register directly.
-`ts_iommu.vhd` does not decode `0xf_e000_2000` (it reads 0), and the core uses
-ASI 0x38 internally as a table-walk ASI, so **every CPU would identify as
-MID 8 and run the master path**; the arbiter enable register (`0xf_e000_1008`)
-is not decoded either. QEMU's default SS-20 CPU (TI
-SuperSparc II, MCNTL byte 8) is type 0x42 with an MXCC: "TI, STP1021PGA(1.x)
+A CPU that reports PSR impl/ver 0x40 with MCNTL.MB = 1 is type 0x40 without
+MXCC ("TMS390Z50(3.x) 0Mb External cache"), and the ROM skips the MXCC and
+SuperSPARC-II suites. With an IOMMU that reports IMPL 0 the reset path takes
+the MID from the CPU — for a no-MXCC SuperSPARC that is ASI 0x38 va 0, which
+`reset_entry` loaded from the MSI MID register — and POST's `get_mid` reads
+the MSI MID register directly; if that register (`0xf_e000_2000`) reads 0,
+**every CPU identifies as MID 8 and runs the master path**. QEMU's default
+SS-20 CPU (TI SuperSparc II, MCNTL byte 8) is type 0x42 with an MXCC: "TI, STP1021PGA(1.x)
 1Mb External cache".
 
 ## 5. Multiprocessor start-up
@@ -483,10 +479,10 @@ undecoded bytes are the Forth pass's gaps (see the header of
    is set (Sun4M §5.1.2 describes arbitration, not stalls, and warns that a
    parked master may keep the bus). Not observable under QEMU (secondaries stay
    halted). Needs a real-hardware trace or the MSI specification.
-2. **The core's CPU identification** (README §4, post-tests §11.2): with the
-   MSI MID register reading 0 and ASI 0x38 used for table walks, every CPU of
-   the 3-CPU build would take the master path. Confirm in simulation before
-   trying the Sun PROM with more than one CPU.
+2. **CPU identification** (README §4, post-tests §11.2): if the MSI MID
+   register reads 0 and ASI 0x38 va 0 does not hold its value, every CPU of
+   an MP build takes the master path. Confirm in simulation before trying the
+   Sun PROM with more than one CPU.
 3. **`post_exit_to_obp` message pointer** `%g3 = 0xffd00010 + (msg & 0x7ffff)`:
    the `+0x10` is unexplained; check how the Forth side prints it.
 4. **NVRAM byte 0x4e** (Stop-D ignored when it is 1 or 2) — guessed to be
@@ -513,11 +509,10 @@ undecoded bytes are the Forth pass's gaps (see the header of
 12. **HyperSPARC** paths are mapped and named but only briefly documented
     (post-tests §10); a few HyperSPARC register bit names come from Linux
     `ross.h` and are unconfirmed.
-13. **QEMU** reports IOMMU version 0x13 and SuperSPARC-II; the core reports
-    IOMMU IMPL 0 and a SuperSPARC-I MCNTL. The two take different branches in
-    `reset_find_mid`, `get_module_type` and `post_main`, so the QEMU trace does
-    not cover the core's path (POST-core and 0x40 paths are reached only by
-    static analysis).
+13. **QEMU** reports IOMMU version 0x13 and SuperSPARC-II. IOMMU IMPL 0 and
+    a SuperSPARC-I MCNTL take different branches in `reset_find_mid`,
+    `get_module_type` and `post_main`, so the QEMU trace does not cover those
+    paths (POST-core and 0x40 paths are reached only by static analysis).
 
 ## 11. Regenerating
 

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
 // Randomised test of ddram_arb: two masters issuing read and write bursts
 // (1-8 beats) to their own address ranges, each waiting for its read data;
 // an in-order pipelined slave with random waitrequest, latency and gaps

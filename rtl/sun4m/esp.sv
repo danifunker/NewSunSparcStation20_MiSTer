@@ -11,8 +11,7 @@
 //   DMA count reload, the CFG2/CFG3 probe); NetBSD dev/sbus/esp_sbus.c
 //   (how the variant is told apart) and dev/ic/ncr53c9x.c (DMA select);
 //   OpenBIOS drivers/esp.c do_command (tests/cpu/src/scsitest.S mode 2);
-//   docs/VERILOG-PLAN.md §6 ESP-7, ESP-8, ESP-9; docs/legacy/impl-gaps/chipset.md
-//   §6 (ESP-1..6); rtl/sun4m/scsi_targets.sv's header (the bus contract).
+//   docs/VERILOG-PLAN.md §6 ESP-7, ESP-8, ESP-9; rtl/sun4m/scsi_targets.sv's header (the bus contract).
 //   The register file, FIFO and interrupt merge follow our Quadra core's
 //   ncr53c96.sv (GPL-2, ours); its built-in target is replaced by the bus
 //   engine below, which drives scsi_targets.

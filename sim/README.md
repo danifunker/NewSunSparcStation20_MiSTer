@@ -66,9 +66,9 @@ The exit status is 0 for a stop string, 1 for a fail string, 2 for the cycle
 limit, and 3 for a usage error. One cycle is one `clk_sys` period; the UART
 bit time comes from `SIM_SYSFREQ` (55 MHz, the board's `clk_sys`).
 
-The ROM download still follows the VHDL core's loader (preload into DDR,
-only the last word through `ioctl`, a 128 KB minimum); the memory
-controller of phase 4 decides how that changes.
+The ROM is preloaded into DDR and only its last word goes through `ioctl`
+(`--full-download` sends it all); the loader starts the machine after at
+least 128 KB.
 
 ## Differences from the board
 

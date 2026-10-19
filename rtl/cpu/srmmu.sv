@@ -554,9 +554,9 @@ module srmmu
     reg_rdata = 32'd0;
     if (reg_asi_i == 8'h04) begin
       case (reg_va_i[12:8])
-        // bits 3:2 (reserved on a SuperSPARC) are the CPU number, as the
-        // TEMLIB core had it: the CPU suite's runtime and TACUS OpenBIOS
-        // send every CPU but 0 to park by it
+        // bits 3:2 (reserved on a SuperSPARC) are the CPU number: the CPU
+        // suite's runtime and the OpenBIOS in bios/ send every CPU but 0 to
+        // park by it
         5'h00: reg_rdata = {mcntl[31:4], cpu_idx_i, mcntl[1:0]};
         5'h01: reg_rdata = ctpr;
         5'h02: reg_rdata = {16'd0, ctx};

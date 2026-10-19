@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# run-nvram.sh 5|20 [--no-build] - the NVRAM image on the SD card (TOD-6,
-# rtl/mister/nvram_sd.vhd) in simulation: the CPU suite runs twice with an
+# run-nvram.sh 5|20 [--no-build] - the NVRAM image on the SD card
+# (rtl/mister/nvram_sd.sv) in simulation: the CPU suite runs twice with an
 # image in slot 3 (sim_main --nvram), both runs in parallel.
 #
 #   blank   8192 zero bytes. The built-in IDPROM, with a serial of its

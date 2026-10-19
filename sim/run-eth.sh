@@ -2,7 +2,7 @@
 #
 # run-eth.sh [5|20] [--no-build] - the Ethernet path in simulation: the
 # ethtest ROM (tests/cpu/src/ethtest.S) with --eth-loop, where the
-# simulation plays Main's side of the frame mailbox (rtl/mister/eth_hps.vhd)
+# simulation plays Main's side of the frame mailbox (rtl/mister/eth_hps.sv)
 # and sends every transmitted frame back. Prints the test lines and the
 # frames the mailbox carried; exit 0 when the run finishes.
 set -uo pipefail

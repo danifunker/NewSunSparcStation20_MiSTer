@@ -27,17 +27,16 @@
 //             "local-watchdog" in the reset search order; wdtest).
 //             Writing a 0 to a status bit clears it; a 1 has no effect.
 //
-// The Aux 0 page is also the TACUS core's private configuration block,
-// which the OpenBIOS build in bios/ (CONFIG_TACUS) reads as 32-bit words
-// (bios/openbios arch/sparc32/openbios.c, entry.S TACUS_RAMSIZE,
-// libopenbios/video_common.c; docs/legacy/HARDWARE_GAPS.md "AUX1"):
+// The Aux 0 page is also a private configuration block, which the OpenBIOS
+// build in bios/ (CONFIG_TACUS) reads as 32-bit words (bios/openbios
+// arch/sparc32/openbios.c, entry.S TACUS_RAMSIZE, libopenbios/video_common.c):
 //   +0x00     bits 31:24 the Sun Aux 0 byte above; 23:16 HWCONF (0x12, the
 //             MiSTer: no Direct SD probe, no video-encoder setup); bit 6
 //             video present (0 with the OSD's serial console: OpenBIOS's
 //             nographic); bit 3 AutoBoot off (OSD); bit 2 CG3 (OSD)
 //   +0x08     the CPU clock in Hz (the cpu node's clock-frequency)
 //   +0x1C     0x5A in bits 31:24, the OSD's memory size in MB in 11:0
-//   others    0 (+0x04 the I2C bus, +0x18 the old Direct SD controller)
+//   others    0 (+0x04 an I2C bus, +0x18 a Direct SD controller: neither here)
 //
 // `rst` is every reset (POR, SW_RST, the reset switch); rst_swr_i and
 // rst_switch_i, sampled during rst, say which kind it was, for the status
@@ -65,7 +64,7 @@ module slavio_misc
   input  logic        pwr_fail_i,     // sets the power-fail interrupt
   output logic        pwr_irq_o,      // the power-fail interrupt (level 15 source)
   input  logic        diag_sw_i,
-  input  logic        cfg_cg3_i,       // TACUS configuration (OSD)
+  input  logic        cfg_cg3_i,       // OpenBIOS configuration (OSD)
   input  logic        cfg_noautoboot_i,
   input  logic        cfg_serial_i,    // console on ttya: "no video" to OpenBIOS
   input  logic [9:0]  cfg_ram_mb_i,

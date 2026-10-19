@@ -10,7 +10,7 @@
  * traps (the slot times out on the board, as t_buserr relies on) or reads
  * another value (QEMU).
  *
- * Found on the board (2026-10-10, docs/sessions/HANDOFF-20261009.md): each
+ * Found on the board (2026-10-10): each
  * L1's snoop queue was 8 entries deep with no overflow check and drained
  * one entry per two cycles, none during a flash sweep; DMA snoops were
  * lost, and a DMA buffer re-read by OpenBIOS came back old. The suite
@@ -138,10 +138,10 @@ BEGIN(t_dma_snoop, "dma: a transfer at a line every two cycles into cached lines
 
 /* The same transfer while the module keeps reloading the buffer's lines
  * (a driver polling a variable that shares a line with its DMA buffer):
- * each snoop drops a line, the next load refills it. In the hybrid the bus
- * accepts a DMA write (and snoops it) well before the memory has it, so a
- * refill can bring the old data back after the snoop; the shim snoops every
- * DMA line again later (snoop_queue RESNOOP). The harness models the lag
+ * each snoop drops a line, the next load refills it. Where the bus
+ * accepts a DMA write (and snoops it) well before the memory has it, a
+ * refill can bring the old data back after the snoop; the harness snoops
+ * every DMA line again later (sim/cpu/snoop_queue.sv RESNOOP). The harness models the lag
  * with +dmalag=N (sim/cpu/run.sh +dmalag=40: passes; with +noresnoop as
  * well: fails). Without the lag it passes either way. */
 BEGIN(t_dma_poll, "dma: a transfer into lines the module keeps reloading meanwhile ends with memory's data in the cache")

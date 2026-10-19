@@ -64,7 +64,7 @@ module escc_chan (
 
   // Interrupt sources, for the chip's IP bits
   // Byte-level taps, for a host that moves whole characters (the MiSTer's
-  // HPS UART, the old core's byte streams): every character the transmitter
+  // HPS UART): every character the transmitter
   // starts is also presented as a byte; a byte offered here enters the
   // receive FIFO as a received character (no framing or parity error) when
   // the receiver is enabled and the FIFO has room.

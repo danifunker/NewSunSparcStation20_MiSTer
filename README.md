@@ -1,33 +1,38 @@
-# SunSparcStation20_MiSTer: the Verilog rewrite
+# SunSparcStation20_MiSTer
 
-A new Sun SPARCstation 20 core for MiSTer, written from scratch in
-SystemVerilog and licensed GPL-2.0-or-later.
+A Sun **SPARCstation 20** (sun4m) for the MiSTer FPGA, written from
+scratch in SystemVerilog: SuperSPARC-compatible CPUs, the sun4m chipset,
+SCSI disks and CD-ROM, Ethernet, the TCX frame buffer, Sun keyboard and
+mouse, and CS4231 audio. Licensed GPL-2.0-or-later.
 
-It starts fresh, with no history from the VHDL core
-(MiSTer-devel/SunSparcStation20_MiSTer). That core is built on
-Grabulosaure's CPU and chipset, published with "All rights reserved" and
-no license. This repository holds only what can be reused: our own code,
-the GPL firmware and framework, the tests, the tools and the
-documentation.
+## Status (2026-10-19)
 
-**Start with [docs/VERILOG-PLAN.md](docs/VERILOG-PLAN.md)**: the clean-room
-rules, the compatibility contracts with Main and OpenBIOS, the
-architecture, the phases and the requirements learned on the VHDL core.
+The core runs with **two SuperSPARC CPU modules at 55 MHz** (about 86 %
+of the FPGA, every clock met). It boots under two PROMs:
 
-## Status (2026-10-13)
+- **OpenBIOS** (built from `bios/`; a matching `boot.rom` is in
+  [releases/](releases/README.md)): NetBSD 11 and Solaris 8 from disk,
+  NetBSD's install CD, CD audio, and the network.
+- **Sun's OBP 2.25** (from a real SS20; not distributed here): its
+  diagnostic POST on both CPUs with no errors, and Solaris 8 with both
+  CPUs on-line.
 
-The core runs on the board with **two SuperSPARC CPU modules** at 55 MHz
-(37.5k ALMs, 89 %, every clock met). Under OpenBIOS (built from `bios/`,
-which must match the core: see the handoff) it boots NetBSD 11 and
-Solaris 8 from disk, NetBSD's install CD, plays CD audio, and runs the
-network on both. Sun's OBP 2.25 runs its diagnostic POST on both CPUs
-with no errors. The CPU suite passes on the board (82 pass, 0 fail, 5
-skip). Where the work stands, and what is next:
-[docs/sessions/HANDOFF-20261009.md](docs/sessions/HANDOFF-20261009.md)
-("Current state" at the top); the phases: [docs/VERILOG-PLAN.md](docs/VERILOG-PLAN.md) §9.
+The bare-metal CPU and chipset test suite (`tests/cpu`) passes on the
+board (84 pass, 0 fail, 5 skip). What is next:
+[docs/VERILOG-PLAN.md](docs/VERILOG-PLAN.md) §9 and §10.
 
-**The core requires the MiSTer SDRAM module** (since 2026-10-19: the TCX's
-frame buffer is on it).
+**The core requires the MiSTer SDRAM module**: the TCX's frame buffer is
+on it.
+
+## Getting started
+
+1. Copy the rbf from [releases/](releases/README.md) to `_Unstable/` (or
+   `_Computer/`) on the SD card.
+2. Copy `releases/boot.rom` (OpenBIOS) to `games/SunSparcStation/boot.rom`,
+   or use Sun's own PROM there instead.
+3. Put disk images in `games/SunSparcStation/` and mount them from the
+   OSD ([docs/disk-images.md](docs/disk-images.md) says how the test
+   images were made).
 
 ## The OSD
 
@@ -94,32 +99,57 @@ every change back, so `setenv` sticks.
 
 | Path | What | License |
 |---|---|---|
-| `bios/` | OpenBIOS (TACUS port) and fcode-utils; `scripts/build-bios.sh` builds the boot ROM | GPL-2 |
-| `sys/` | Template_MiSTer framework | GPL-2+ |
-| `rtl/pkg/`, `rtl/lib/` | the bus and memory packages (`iobus_pkg`, `mem_pkg`, `sbus_pkg`, `sun4m_pkg`, `ss20_ddr_pkg`), building blocks (`ram_tdp_be`, `ram_sdp_be`) | ours |
 | `rtl/cpu/` | the CPU module: `iu` (pipeline) and its parts, `fpu` (`fp_unpack`, `fp_round`, `fp_divsqrt`), `srmmu`, `l1cache`, `cpu_module` (+ benches in `tb/`) | ours |
-| `rtl/machine/` | the machine: `ss20_machine` (NCPU modules, default 2), `ss20_mbus`, `ss20_memctl`, `ss20_iobridge`, `ss20_loader`, `ss20_uart`, `ss20_osd` | ours |
-| `rtl/obio/` | the new sun4m system devices: `slavio_timer`, `slavio_intctl`, `slavio_misc`, `m48t08`, `escc` (+ benches in `tb/`) | ours |
-| `rtl/tb/` | `run.sh`: lint every module and run every block bench under Verilator; `tb_pkg.sv` | ours |
-| `rtl/mister/` | `ddram_arb.sv`, `eth_hps.sv`, `nvram_sd.sv` (+ benches; the VHDL originals are in git history) | ours |
-| `rtl/sun4m/` | the SBus and on-board devices: `ss20_msi` (IOMMU), `emc` (memory controller registers), `dma2`, `esp` + `scsi_targets`, `lance` (+ `wish7990_*`, MIT), `tcx`, `cs4231` (+ APC), `fdc82077`, `sun_kbd`, `sun_mouse`, `kbd_beep`; the FCode PROMs `tcx_fcode`, `cs4231_fcode`, `slote_fcode` | ours / MIT (Wish7990) / GPL-2 (TCX FCode) |
-| `tests/cpu/` | bare-metal SPARC V8 / sun4m test suite that runs as the boot PROM, QEMU references | ours |
-| `sim/` | Verilator harnesses: the whole machine (`build.sh`, `sim_main.cpp`: Main's hps_io, SD, DDR, UART, Ethernet models; `run-*.sh`), the CPU module (`sim/cpu/`), the IU (`sim/iu/`) | ours |
+| `rtl/machine/` | the machine: `ss20_machine` (NCPU modules, default 2), `ss20_mbus`, `ss20_memctl`, `ss20_iobridge`, `ss20_loader`, `ss20_uart`, `ss20_osd`, `vram_sdram` | ours |
+| `rtl/obio/` | the sun4m system devices: `slavio_timer`, `slavio_intctl`, `slavio_misc`, `m48t08`, `escc` | ours |
+| `rtl/sun4m/` | the SBus and on-board devices: `ss20_msi` (IOMMU), `emc`, `dma2`, `esp` + `scsi_targets`, `lance`, `tcx`, `cs4231` (+ APC), `fdc82077`, `sun_kbd`, `sun_mouse`, `kbd_beep`; the FCode PROMs `tcx_fcode`, `cs4231_fcode`, `slote_fcode` | ours, except below |
+| `rtl/mister/` | the MiSTer side: `ddram_arb`, `sdram64`, `eth_hps`, `nvram_sd` | ours |
+| `rtl/pkg/`, `rtl/lib/`, `rtl/video/` | packages, RAM templates, the hang reporter, video timing | ours |
+| `rtl/tb/` | `run.sh`: lint every module and run every block bench under Verilator | ours |
+| `sim/` | Verilator harnesses: the whole machine (`build.sh`, `sim_main.cpp`, `run-*.sh`), the CPU module (`sim/cpu/`), the IU (`sim/iu/`) | ours |
+| `tests/cpu/`, `tests/fpu/` | the bare-metal SPARC V8 / sun4m suite that runs as the boot PROM, with QEMU references; FPU vectors | ours |
+| `syn/` | a Quartus fit of the CPU module alone, for timing work | ours |
 | `scripts/` | build, deploy, board regression (`hwtest.sh`, `board/`) | ours |
-| `tools/` | ROM analysis (`romdis/`), FCode, NVRAM, CD-audio, UFS, NeXTSTEP and MiSTer tools; `debugarm/pcdump.c` | ours |
-| `docs/rom-disassembly/` | our analysis of the SS20 OBP 2.25 and SS5 OBP 2.15 PROMs (no Sun code) | ours |
-| `docs/arch/` | the bus definitions (`bus.md`) and the physical address map (`memory-map.md`) | ours |
-| `docs/references/` | the index of the reference library (datasheets, Sun specs, emulator and OS sources) kept locally in `scratch/reference/` | ours |
-| `docs/legacy/` | the VHDL core's plans, gap audits, design notes and session hand-offs | ours |
-| `releases/` | test builds: the core's rbf and the OpenBIOS `boot.rom` it needs ([releases/README.md](releases/README.md)) | GPL |
-| `scratch/` | local only, gitignored: reference manuals, Sun PROM images and their full disassembly, candidate RTL from other cores (see `scratch/README.md`) | not in git |
+| `tools/` | ROM analysis (`romdis/`), FCode, NVRAM, CD-audio, UFS, NeXTSTEP, UnixBench and MiSTer tools | ours |
+| `docs/` | the plan ([VERILOG-PLAN.md](docs/VERILOG-PLAN.md)), the architecture (`arch/`), our analysis of the SS20 and SS5 PROMs (`rom-disassembly/`, no Sun code), benchmarks, the reference index | ours |
+| `bios/` | OpenBIOS and fcode-utils; `scripts/build-bios.sh` builds the boot ROM | GPL-2 |
+| `sys/` | the Template_MiSTer framework, unchanged | GPL-2+ |
+| `releases/` | test builds: the rbf and the OpenBIOS `boot.rom` it needs | GPL |
 
-Not here, on purpose: Grabulosaure's RTL and tools; Keith Conger's CS4231
-model; Sun PROM images and their disassembly listings. Test builds (an
-rbf and the matching OpenBIOS ROM) are in [releases/](releases/README.md).
+Not here, on purpose: Sun PROM images and anything reproduced from them.
+
+## Building
+
+- The core: Quartus 17.0.2 Lite, `scripts/build.sh 20` (output in
+  `output_files/`).
+- OpenBIOS: `scripts/build-bios.sh` (a SPARC cross GCC and `xsltproc`).
+- Benches: `rtl/tb/run.sh` (Verilator 5); the CPU suite in simulation:
+  `sim/cpu/run.sh`; the whole machine: `sim/build.sh` and
+  [sim/README.md](sim/README.md).
+
+## Thank you
+
+A big thank you to **Grabulosaure**, whose SPARCstation work on FPGA
+inspired us to write this core.
+
+## Third-party components
+
+These keep their own licenses and authors:
+
+- **OpenBIOS** (`bios/openbios/`), GPL-2.0: the OpenBIOS project, with
+  the sparc32 port for FPGA SPARCstations (`CONFIG_TACUS`) by
+  Grabulosaure, which we extend for this machine.
+- **fcode-utils** (`bios/fcode-utils/`), GPL-2.0: the OpenBIOS project.
+- **The TCX FCode PROM** (`rtl/sun4m/tcx_fcode.sv`), GPL-2.0: the image
+  QEMU ships (`pc-bios/QEMU,tcx.bin`), built from OpenBIOS's
+  `drivers/tcx.fs`.
+- **Template_MiSTer** (`sys/`), GPL-2.0+: the MiSTer project
+  (Sorgelig and contributors).
+- **Wish7990** (`rtl/sun4m/wish7990_*.sv`, `rtl/pkg/wish7990_pkg.sv`),
+  MIT: MelkhiorVintageComputing, the Am7990 LANCE core.
 
 ## License
 
-GPL-2.0-or-later for our files ([LICENSE](LICENSE)); OpenBIOS and the
-TCX/CG3 FCode it carries are GPL-2.0; `sys/` is GPL-2.0+. The Sun PROM
-images are Sun/Oracle copyright and are never committed.
+GPL-2.0-or-later for our files ([LICENSE](LICENSE)); the components above
+under their own licenses. The Sun PROM images are Sun/Oracle copyright
+and are never committed.

@@ -171,7 +171,7 @@ module slavio_intctl
       hard[13:1] = is_target ? hard_lvl[13:1] : '0;
       // the processor's own counter goes straight into its pending register
       // (§5.7.4's flow: Timer N and Soft Int N bypass the system mask, MA
-      // included); TACUS OpenBIOS leaves MA set and ticks at level 14
+      // included); the OpenBIOS in bios/ leaves MA set and ticks at level 14
       hard[14]   = timer_cpu_i[n];
       hard[15]   = l15[n];
     end

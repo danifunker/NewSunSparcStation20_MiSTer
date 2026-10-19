@@ -2,7 +2,7 @@
  * apart from the suite (python3 tests/cpu/build.py ss20 --main=kbdtest) and
  * driven from the MiSTer by scripts/hwtest.sh's kbd test, which types on a
  * virtual keyboard (scripts/board/uinput_keys.py): the keys reach the core
- * as PS/2 through Main, go through ts_ps2sun and ts_sunkb, and arrive on
+ * as PS/2 through Main, go through rtl/sun4m/sun_kbd.sv, and arrive on
  * the keyboard ESCC's channel A, which this ROM polls.
  *
  * It prints "KBD?", then every byte received, in hex, until 2 s pass with

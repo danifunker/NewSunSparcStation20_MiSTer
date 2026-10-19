@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
 // A master abandons a write burst (reset mid-burst). The arbiter must finish
 // the burst with the byte enables off after its watchdog (WTO = 6 here), then
 // let the other master through, and the abandoned beats must not write.

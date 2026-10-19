@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 //
-// hang_dump: a board-side debugging aid (ss20_machine's HANG_DUMP, and
-// the old CPU hybrid's cpu_plomb.sv). It watches the IU's commits and traps; when no instruction has committed for 2^CBITS
+// hang_dump: a board-side debugging aid (ss20_machine's HANG_DUMP). It watches the IU's commits and traps; when no instruction has committed for 2^CBITS
 // CPU cycles ("C"), or no trap has been taken for 2^TBITS cycles ("T": a
 // running kernel takes clock interrupts, so this is a spin with traps
 // off; armed once an interrupt trap and a user-mode commit have both been
@@ -16,7 +15,7 @@
 // all 32-bit hex: cpc the last committed PC; psr; w0-w5 the CPU module's
 // debug words (cpu_module.sv: pipeline + memory request, data request VA,
 // data request / state bits, fetch VA, cache and walker states, memory
-// PA); x the bridge's state (cpu_plomb.sv); r0-r15 the last sixteen
+// PA); x a word of the instantiator's (0 in ss20_machine); r0-r15 the last sixteen
 // committed PCs, oldest first; t0-t7 the PCs of the last eight traps,
 // oldest first, and their tts packed four to a word (t0's in the top
 // byte). After the line it re-arms: a further hang of the other kind, or

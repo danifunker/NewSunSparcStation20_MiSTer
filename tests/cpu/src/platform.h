@@ -7,7 +7,6 @@
  *   ss5-qemu  qemu-system-sparc -M SS-5    PROM at pa 0x0_70000000 (as on a
  *                                          real SPARCstation 5)
  *   ss5-core  this core's SS5 build        PROM at pa 0x0_F0000000
- *                                          (rtl/sun4m/ts_decode.vhd sel.rom)
  *   ss20      qemu -M SS-20 and the core   PROM at pa 0xF_F0000000, run in
  *                                          boot mode from VA 0
  *

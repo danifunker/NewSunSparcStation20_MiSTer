@@ -584,8 +584,8 @@ module ss20_machine #(
     .scan_readdata(sc_dout), .scan_readdatavalid(sc_rdv),
     .clk_vid, .vid_ce_o, .vid_r_o, .vid_g_o, .vid_b_o, .vid_hs_o, .vid_vs_o, .vid_de_o);
 
-  // 10: slot 3, the audio card (CS4231 + APC, its FCode PROM): TACUS
-  // OpenBIOS always declares it
+  // 10: slot 3, the audio card (CS4231 + APC, its FCode PROM): the
+  // OpenBIOS in bios/ always declares it
   logic [15:0] aud_l, aud_r;
   cs4231 #(.CLK_HZ(CLK_HZ)) u_audio (
     .clk, .rst(rst_m), .bus_i(iob_q[10]), .bus_o(iob_r[10]), .dvma_o(dvma_q[2]), .dvma_i(dvma_r[2]),

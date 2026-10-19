@@ -1,9 +1,8 @@
 //============================================================================
 //  Two Avalon-MM masters onto the one DDRAM port of the stock MiSTer
-//  framework. ss_core has two DDR3 ports (video; CPU + BIOS download), which
-//  the core's old, modified sys_top provided; Template_MiSTer provides one.
+//  framework (Template_MiSTer provides one port).
 //
-//  The masters are plomb_avalon64 bridges. They pipeline: a bridge may
+//  The masters are 64-bit Avalon bridges. They pipeline: a bridge may
 //  present its next command as soon as the previous one is accepted, before
 //  that read's data has returned, and it may pause between the beats of a
 //  write burst. So:

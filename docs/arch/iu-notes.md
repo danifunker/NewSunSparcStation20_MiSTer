@@ -16,7 +16,6 @@ Where the sources disagree, it says so and gives each side.
 | **QEMU** | QEMU `target/sparc/` | `scratch/reference/emulators/qemu/target/sparc/<file>:line` |
 | **tests** | the project's CPU suite | `tests/cpu/…:line` |
 | **PLAN** | `docs/VERILOG-PLAN.md` | § |
-| **gaps** | `docs/legacy/impl-gaps/cpu.md` | IDs (IU-1 …) and line numbers. Its old-core file names are history; only its hardware facts are used here |
 
 The request asked for "Chapter 5 instruction definitions" and "Appendix B
 encodings". In this edition of V8, Chapter 5 is the overview (formats,
@@ -36,8 +35,7 @@ gives the correct symbols.
 ### 1.1 r registers and windows
 
 - **NWINDOWS = 8.** Sources: PLAN §3 phase 1; QEMU `cpu.c:488`
-  (`TI-SuperSparc-60`: `.nwindows = 8`); gaps line 237 ("NWINDOWS 8 (both
-  modules)"); test `t_wim_bits` expects 8 (`tests/cpu/src/t_window.S:96-99`).
+  (`TI-SuperSparc-60`: `.nwindows = 8`); test `t_wim_bits` expects 8 (`tests/cpu/src/t_window.S:96-99`).
   V8 allows 2..32 (V8 §4.1).
 - **Total r registers:** 8 globals + NWINDOWS × 16 = 136 for 8 windows
   (V8 §4.1).
@@ -77,8 +75,8 @@ gives the correct symbols.
   SAVE with traps enabled. With traps disabled they remain valid
   (V8 §4.1 Programming Note).
 - **Register file contents after reset:** uninitialized (Viking Table 4-1;
-  gaps line 631: the PROMs pass POST results in %g1-%g7 because the
-  register file is not reset).
+  the PROMs pass POST results in %g1-%g7 because the register file is not
+  reset).
 
 ### 1.2 PSR (Processor State Register)
 
@@ -100,7 +98,7 @@ reset trap (V8 §7.4 "Reset Trap", §7.6 "reset").
 | 7 | S | supervisor | **1** (V8 §7.4; Viking Table 4-1; QEMU `cpu.c:62`) |
 | 6 | PS | S at the time of the most recent trap | QEMU 1 (`cpu.c:63`); V8 says nothing about it |
 | 5 | ET | enable traps. A trap clears it | **0** (V8 §7.4; Viking Table 4-1; QEMU `cpu.c:61`) |
-| 4:0 | CWP | current window | Viking: uninitialized (Table 4-1). QEMU 0 (`cpu.c:47`). The old core reset it to 0 (gaps line 636) |
+| 4:0 | CWP | current window | Viking: uninitialized (Table 4-1). QEMU 0 (`cpu.c:47`) |
 
 - The PSR is modified by SAVE, RESTORE, Ticc, RETT, traps, every
   icc-setting instruction, and WRPSR (V8 §4.2).
@@ -109,7 +107,7 @@ reset trap (V8 §7.4 "Reset Trap", §7.6 "reset").
 - **WRPSR with result CWP ≥ NWINDOWS → illegal_instruction, and the PSR is
   not written** (V8 §B.29; ISP V8 §C.9 "Write State Register",
   `sparcv8.txt:8432-8475`; QEMU `win_helper.c:165-175`). Test
-  `t_wrpsr_cwp` (`tests/cpu/src/t_iu2.S:182-197`; gaps IU-5).
+  `t_wrpsr_cwp` (`tests/cpu/src/t_iu2.S:182-197`; IU-5).
 - **The PSR seen by the suite at start-up** (after `wr %g0, S|PS|PIL, %psr`
   and some code) is printed as `psr=40400fc0` in every SS20 log: impl 4,
   ver 0, Z = 1, EF = 0, PIL = 15, S = 1, PS = 1, ET = 0, CWP = 0
@@ -194,15 +192,15 @@ reset trap (V8 §7.4 "Reset Trap", §7.6 "reset").
   the JTAG-only MCMD.INITM bit is set (Viking §4.4.6). The Viking document
   does not say what other RDASR/WRASR encodings do (see "Not established").
 - **What the acceptance test requires (`t_rdasr`,
-  `tests/cpu/src/t_iu2.S:199-233`; gaps IU-6):** `rd %asr1`
+  `tests/cpu/src/t_iu2.S:199-233`; IU-6):** `rd %asr1`
   (`0xa1404000`), `rd %asr2` (`0xa3408000`) and `rd %asr15, %l2`
   (`0xa543c000`, rd ≠ 0) all **read Y** and do not trap.
   `wr %l4, %g0, %asr1` (`0x83850000`) **does not change Y** and does not
   trap. CASA (`0xe5e40171`, op3 0x3c) → **illegal_instruction**, and memory
   is unchanged. The test's comment cites the microSPARC-I/II manuals ("every
   ASR read acts as RDY and every ASR write as a NOP"), and OpenSSL's
-  `wr %g0,%y; rd %asr2` V8/V9 probe (NetBSD `syslogd`/`login` got SIGILL
-  when the old core trapped it).
+  `wr %g0,%y; rd %asr2` V8/V9 probe (NetBSD `syslogd`/`login` get SIGILL
+  if it traps).
 - QEMU: RDASR with any rs1 except 15 reads Y (`insns.decode:113-130`,
   `RDY_v7`). ASR17 is LEON-only. Every `rs1 = 15` encoding is STBAR,
   whatever rd is, and bit 13 is ignored. Solaris 8 executes `0x8143e008`
@@ -486,8 +484,8 @@ The IU passes the 8-bit ASI with each data access. V8 defines only
 0x08-0x0B (V8 §5.3 Table 5-3). The rest are listed as "suggested" in
 V8 Appendix I. Viking decodes all 8 bits, and an access to a reserved value
 is an error (data_access_exception with MFSR.CS) (Viking §4.16,
-§4.11.11.3). The old core truncated ASIs to 6 bits, so 0x4C hit the
-0x0C I-cache tag (gaps MMU-12; test `t_asi_width`).
+§4.11.11.3). All 8 bits matter: 0x4C must not alias the 0x0C I-cache
+tag (MMU-12; test `t_asi_width`).
 
 | ASI | Use on the SS20 (SuperSPARC, MBus mode, no MXCC) | Source / user |
 |---|---|---|
@@ -633,7 +631,7 @@ new %o3; `restore %i2,1,%o4` writes the old window's %o4)
   (V8 §B.3, §B.6, §B.23, §B.34, §C.6). Viking never sets EC and never
   raises cp_exception (Viking §4.13.4.7).
 - **They trap in user mode too, and the store forms leave memory
-  unchanged** (test `t_cp_ldst`, `tests/cpu/src/t_iu2.S:135-180`; gaps
+  unchanged** (test `t_cp_ldst`, `tests/cpu/src/t_iu2.S:135-180`;
   IU-3). STDCQ is listed as privileged (V8 §B.6). `t_cp_ldst` expects
   cp_disabled for STDCQ in supervisor mode (check 6). Its only user-mode
   case is STC (check 10).
@@ -680,10 +678,9 @@ new %o3; `restore %i2,1,%o4` writes the old window's %o4)
 - **Trap priority with a pending fp_exception:** mem_address_not_aligned
   (10) is taken before fp_exception (11). A misaligned FP store with an
   exception pending takes tt 7, memory is not written, and the exception
-  stays pending until the next FP instruction (V8 Table 7-1; gaps FPU-1;
+  stays pending until the next FP instruction (V8 Table 7-1; FPU-1;
   test `t_fpu_trap_prio`, `tests/cpu/src/t_iu2.S:20-74`).
-  fp_disabled (8) is above mem_address_not_aligned (10) (gaps line
-  238-239, "checked and right").
+  fp_disabled (8) is above mem_address_not_aligned (10) (V8 Table 7-1).
 - **FQ and STDFQ:**
   - STDFQ stores the front entry, address at EA and instruction at EA + 4,
     then advances the queue. FSR.qne (bit 13) shows whether entries remain
@@ -789,11 +786,10 @@ Code: `12: CTI→40`, `16: CTI→60`, with targets 40 and 60.
     whose leaf callee returns with `retl`. It runs 16 times per N with the
     MMU and caches on. **%o7 must equal the jmpl's own address** (check
     codes 0x10-0x18) (`tests/cpu/src/t_dcti.S:1-85`).
-  - The bug it catches (from the old core, recorded as a fact in the
-    test's comment): the JMPL, the RETT's target, reached decode while the
+  - The bug it catches (described in the test's comment): the JMPL, the RETT's target, reached decode while the
     RETT was still held behind the stores, and it took the RETT's address
     as its PC. The link then pointed at the RETT, and `retl` landed 8
-    bytes after it (`t_dcti.S:1-17`; `docs/legacy/PLAN.md:67`).
+    bytes after it (`t_dcti.S:1-17`).
   - The test needs the caches on because an uncached target fetch "always
     loses the race" (`t_dcti.S:69-71`). It passes under QEMU (README:85).
 
@@ -891,9 +887,9 @@ exceptions recur when the instruction re-executes (V8 §7.3).
 - The trap priorities are implementation-dependent, but the tt values are
   fixed (V8 §7.4).
 - The ISP `select_trap` order (V8 §C.8) matches Table 7-1.
-- **IU-2 (gaps line 195-202):** an interrupt has lower priority than a
-  synchronous trap of the same instruction (priorities 17-31). The old core
-  let a pending interrupt override an ALU/LSU trap.
+- **IU-2:** an interrupt has lower priority than a synchronous trap of
+  the same instruction (priorities 17-31): a pending interrupt must not
+  override an ALU/LSU trap.
 
 ### 4.2 Precise, deferred and interrupting traps (V8 §7.1, §7.2)
 
@@ -931,8 +927,8 @@ QEMU does the same steps (`int32_helper.c:162-171`):
 `psret = 0; cwp = cwp−1; %l1 = pc; %l2 = npc; psrps = psrs; psrs = 1;
 tbr = (tbr & 0xfffff000) | tt << 4; pc = tbr; npc = pc + 4`. For tt
 0x10-0x1F it also calls an interrupt-acknowledge hook
-(`int32_helper.c:174-179`). The old core never drove its `intack` output
-and nothing used it (gaps line 234).
+(`int32_helper.c:174-179`). Nothing on the SS20 uses an interrupt
+acknowledge.
 
 ### 4.4 Interrupts (V8 §7.3, §7.6; Viking §4.13.4.16)
 
@@ -999,7 +995,7 @@ jumps (delayed) to the target.
   - On Viking, SFSR bit 17 **EM**, "Error Mode Reset Taken", replaces the
     reset register's WD bit. It raises the module-error pin and is cleared
     when the SFSR is read (`Sun4M…txt:5116-5118`, `:5134`).
-- **Requirement IU-1 and the `wdtest` ROM** (PLAN §6; gaps lines 166-193;
+- **Requirement IU-1 and the `wdtest` ROM** (PLAN §6;
   `tests/cpu/src/wdtest.S`):
   1. The first boot writes a marker in RAM, clears ET and runs `ta 0x7f`,
      which enters error mode.
@@ -1012,12 +1008,9 @@ jumps (delayed) to the target.
      - the RAM marker survived.
   - wdtest is built as a separate image because it resets the machine
     (`wdtest.S:1-27`, `:44-77`).
-  - VA 0xB00 was a private register of the old core (gaps line 294: "The
-    private registers `0xB00` (SFSR, no clear)"). Viking's architectural
-    non-clearing SFSR alias is VA 0x1300 (Viking Table 4-9; QEMU
-    `ldst_helper.c:682-684`).
-  - The old core did not model the level-15 broadcast. Its reset was the
-    whole machine's (gaps lines 168-174).
+  - VA 0xB00 is a project-private non-clearing SFSR read, not Viking's.
+    Viking's architectural non-clearing SFSR alias is VA 0x1300 (Viking
+    Table 4-9; QEMU `ldst_helper.c:682-684`).
 - **QEMU:** a trap with ET = 0 calls `cpu_abort(... "Error state")`, which
   stops the emulator (`int32_helper.c:125-134`). It has no watchdog, so
   `wdtest` cannot run there. QEMU also suppresses MMU faults when
@@ -1052,7 +1045,7 @@ jumps (delayed) to the target.
 - **The suite's reset code** (`runtime.S:20-130`):
   - At tt 0 it jumps to `reset`. On the SS20 it reads MCNTL (`lda [%g0] 4`)
     bits 3:2 as a CPU number and parks every CPU except 0. Those bits are
-    the old core's field, reserved on a real SuperSPARC; QEMU reads 0
+    reserved on a real SuperSPARC; QEMU reads 0
     (`runtime.S:36-45`).
   - It then writes `PSR = S|PS|PIL15` (ET = 0, CWP = 0), WIM = 0 and
     TBR = trap_table, each followed by 3 nops.
@@ -1116,7 +1109,7 @@ jumps (delayed) to the target.
 | Register | Value | Sources |
 |---|---|---|
 | PSR impl/ver | 4 / 0 (byte 0x40) | QEMU `cpu.c:479-480` ("TI-SuperSparc-60", STP1020APGA, `iu_version 0x40000000`, "SuperSPARC 3.x"); Viking §4.4.3 ("PSR.IMPL … always … 0x4. The PSR.VER … 0x0"); SS-II Table A-51 (PSR VER byte 0x40 for SuperSPARC 3.x/4.x/5.x and SuperSPARC II); suite logs `psr=40400fc0`. **Disagreement:** Viking §4.6.1 says "Viking always sets both FSR.VER and PSR.IMPL fields to zero", and Viking Table 4-1 prints "Ver=4, Impl=0" |
-| MCNTL (ASI 4 VA 0) IMPL/VER | IMPL 0, VER 1; with MB = 1 the register reads `0x01000800` | QEMU `cpu.c:482` (`mmu_version 0x01000800`, "SuperSPARC 3.x, no MXCC"); SS-II Table A-51 (MCNTL VER: 3.x = 1, 4.x = 2, 5.x = 3; SuperSPARC II 8 / 0xA); gaps lines 117-119, 426-428 (OBP prints "TMS390Z50(3.x) 0Mb External cache"; NetBSD "SuperSPARC v3"). **Disagreement:** Viking §4.11.11.1 (1990) says MCNTL.Ver is fixed at 0 |
+| MCNTL (ASI 4 VA 0) IMPL/VER | IMPL 0, VER 1; with MB = 1 the register reads `0x01000800` | QEMU `cpu.c:482` (`mmu_version 0x01000800`, "SuperSPARC 3.x, no MXCC"); SS-II Table A-51 (MCNTL VER: 3.x = 1, 4.x = 2, 5.x = 3; SuperSPARC II 8 / 0xA); the OBP prints "TMS390Z50(3.x) 0Mb External cache" and NetBSD "SuperSPARC v3". **Disagreement:** Viking §4.11.11.1 (1990) says MCNTL.Ver is fixed at 0 |
 | FSR.ver | 0 | QEMU `cpu.c:481`; SS-II A.3.4.1 |
 | NWINDOWS | 8 | §1.1 |
 | QEMU features | `CPU_DEFAULT_FEATURES` = MUL, DIV, FSMULD (no CASA, no FLOAT128) | `cpu.c:489`; `cpu.h:257-258` |
@@ -1168,14 +1161,14 @@ jumps (delayed) to the target.
 | 9 | IE | I-cache enable | 0 |
 | 8 | DE | D-cache enable | 0 |
 | 7 | PSO | partial store order | 0 |
-| 6:2 | — | reserved (bit 6 was the old core's private L2-TLB enable, PLAN §3 phase 3 / `t_mmu_l2`; bits 3:2 were its CPU number, `runtime.S:36-45`) | — |
+| 6:2 | — | reserved (in this project bit 6 is the L2-TLB enable, PLAN §3 phase 3 / `t_mmu_l2`; the suite reads bits 3:2 as a CPU number, `runtime.S:36-45`) | — |
 | 1 | NF | no-fault (faults on ASIs 0x08, 0x0A, 0x0B, 0x20-0x2F are not reported; the FSR is still written) | 0 |
 | 0 | EN | MMU enable | 0 |
 
 - QEMU write mask: bits 31:24 are kept and bits 23:0 written
   (`ldst_helper.c:1003-1005`). A change of NF or BM flushes QEMU's TLB.
 - Known values: OpenBIOS starts secondaries with MCNTL = 0x001; Linux sets
-  `0x4140` bits on CPU 0 (gaps lines 578-580); PLAN §3 phase 9 says
+  `0x4140` bits on CPU 0; PLAN §3 phase 9 says
   "OpenBIOS secondary start (MCNTL 0x041)".
 
 ### 6.4 Access errors, as the IU sees them
@@ -1198,8 +1191,8 @@ jumps (delayed) to the target.
     a load the bus refuses (SFSR `0x816`: TO, AT 0, FT 5, FAV; SFAR = VA)
     and **tt 0x21 (instruction_access_error)** for a fetch (SFSR `0x874`,
     no FAV). A table walk that reads a refused address is FT 4 + L, tt 9
-    (`tests/cpu/src/t_buserr.S:1-21`, README:87; PLAN A3/B1; gaps MMU-4
-    "Done").
+    (`tests/cpu/src/t_buserr.S:1-21`, README:87; PLAN A3/B1;
+    MMU-4).
   - QEMU raises `TT_CODE_ACCESS` 0x21 / `TT_DATA_ACCESS` 0x29 for
     unassigned accesses with the MMU on (`ldst_helper.c:422-481`). The
     test SKIPs on QEMU (README deviation 11).
@@ -1300,8 +1293,8 @@ deviates (§7.2). The known hazards to test from the start are A1
 - Run 16 times for each count, with the MMU and caches on (it calls
   `mmu_tables_init` / `mmu_on` from `mmu_setup.S`).
 - Check: %o7 = the jmpl's address (codes 0x10, 0x11, 0x12, 0x14, 0x18).
-- It failed on the unfixed old IU in simulation (6 of 16 with 8 stores)
-  and passes under QEMU.
+- An IU without the fix fails it in simulation (6 of 16 with 8 stores);
+  it passes under QEMU.
 
 **`t_psr.S`** (`README.md:74`)
 - `t_psr_fields`: impl/ver are read-only under WRPSR; PIL can be written
@@ -1441,12 +1434,11 @@ running it.
 - The FQ has one entry (`int32_helper.c:151-157`); Viking's has 4.
 - State-register writes take effect at once (V8 allows 0-3 delays).
 
-### 7.4 Old-core facts recorded in gaps (hardware facts only)
+### 7.4 Facts checked on hardware
 
-- "Checked and right" on the old core: trap entry and return; PSR impl/ver
-  0x04 (SS5) and 0x40 (SS20); NWINDOWS 8; FSR.ver 4 and 0;
-  `privileged_instruction` over `illegal_instruction`; `fp_disabled` over
-  `mem_address_not_aligned` (gaps lines 236-240).
+- Trap entry and return; PSR impl/ver 0x04 (SS5) and 0x40 (SS20);
+  NWINDOWS 8; FSR.ver 4 and 0; `privileged_instruction` over
+  `illegal_instruction`; `fp_disabled` over `mem_address_not_aligned`.
 - IU-1 error mode, IU-2 interrupt priority, IU-3 LDC/STC family, IU-5
   WRPSR CWP check, IU-6 ASRs and CASA, FPU-1 trap priority, FPU-2 FQ and
   sequence error: each is described above with its test.

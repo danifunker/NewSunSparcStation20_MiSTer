@@ -349,7 +349,7 @@ END
  * memory image must match word for word: every write-back burst has to
  * reach the DDR intact. The DDR arbiter stalls write beats at will (video
  * has priority), and a stalled odd beat once overwrote the even word of
- * its 64-bit pair in the plomb-to-Avalon bridge: the lock byte of a line
+ * its 64-bit pair in a bus-to-Avalon bridge: the lock byte of a line
  * landed on its neighbour (t_smp_atomic's 0xff000000 counter). Code of a
  * failing check = the word's byte offset in the page. */
 #define WB_LINES        32

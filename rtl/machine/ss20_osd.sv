@@ -108,7 +108,7 @@ module ss20_osd (
     end
   end
 
-  // 464 MB is seven 64 MB SIMMs and a 16 MB one, the VHDL core's maximum:
+  // 464 MB is seven 64 MB SIMMs and a 16 MB one, the core's maximum:
   // the rest of the FPGA's 512 MB DDR3 window holds the PROM image, the
   // VRAM and the framework's scaler buffers.
   always_comb begin

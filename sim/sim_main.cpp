@@ -169,7 +169,7 @@ struct Ddr {
 
 // ---------------------------------------------------------------------------
 // Main's side of the Ethernet mailbox (Main: support/sun/sun_enet.cpp;
-// layout in rtl/mister/eth_hps.vhd). Every POLL cycles: frames the core
+// layout in rtl/mister/eth_hps.sv). Every POLL cycles: frames the core
 // posted in the TX ring are logged and, with --eth-loop, sent back through
 // the RX ring (with the FCS and the LADRF index, as Main adds them), so the
 // LANCE receives what it sent.

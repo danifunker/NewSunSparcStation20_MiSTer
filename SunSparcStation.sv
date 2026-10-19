@@ -54,8 +54,8 @@ assign BUTTONS   = 2'd0;
 // taken at the next reset (ss20_osd latches it), and "Changes pending"
 // shows until then.
 //
-// The status bits are the VHDL core's (rtl/machine/ss20_osd.sv lists them,
-// with the retired ones that must stay unused). Option text may change; a
+// The status bits are fixed (rtl/machine/ss20_osd.sv lists them, with the
+// retired ones that must stay unused), so users' .CFG files keep working. Option text may change; a
 // bit's meaning may not.
 //
 // "F0" is Load ROM: not remembered, so a normal start loads

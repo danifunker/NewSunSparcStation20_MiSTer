@@ -138,7 +138,7 @@ BEGIN(t_prom70, "chipset: the PROM answers at pa 0x7000_0000")
 END
 #endif
 
-/* 82077 floppy controller, no drive (ts_fdc). Leaf routines; each gives
+/* 82077 floppy controller, no drive (fdc82077). Leaf routines; each gives
  * up after about 100000 status reads, so a missing controller fails the
  * test instead of hanging the suite. */
 /* write %o0 to the FIFO once the controller asks for a byte (RQM, !DIO) */
@@ -264,8 +264,8 @@ BEGIN(t_tcx_accel, "chipset: TCX stipple and blit doubleword stores")
         clr %o2
         set 0x03000000, %o3             /* 4 pixels from pixel 0 */
         stda %o2, [%l3] TCX_ASI
-        /* The copy may finish after the store is accepted (the VHDL core's
-           TCX acks first; a 55 MHz CPU's next load gets there before it):
+        /* The copy may finish after the store is accepted (a TCX may ack
+           first; a 55 MHz CPU's next load gets there before it):
            read until the pixels arrive, a few hundred tries at most. */
         set 512, %l5
 1:      lda [%l2] TCX_ASI, %l4

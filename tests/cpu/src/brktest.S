@@ -6,8 +6,7 @@
  *       --send 'BRK?=>\B' --stop 'CPUTEST DONE' --cycles 60M
  * and on the board a tcsendbreak() on the MiSTer's /dev/ttyS1 does.
  *
- * The core (ts_aciamux) holds a BREAK back ~71 ms in case '3' or '4'
- * follows (the debug link), then shows it to the ESCC for ~71 ms: RR0
+ * The core shows a BREAK to the ESCC: RR0
  * bit 7, an External/Status interrupt on each edge when WR15 bit 7 and
  * WR1 bit 0 are set (RR3 bit 3 for channel A, vector code 101), RR0 bit 7
  * latched while it is pending, and a NUL received when the BREAK starts.

@@ -3,9 +3,9 @@
 // tb_sun_kbd: sun_kbd against a model of the ESCC's byte port. PS/2 events
 // are driven the way hps_io presents them; the byte stream, its pacing, the
 // reset reply (with held keys), the layout reply, LEDs, bell and click are
-// checked. The cases are those of the old core's tb_kbd (plain key, F1,
+// checked. The cases: a plain key, F1,
 // Stop-A both ways, AltGraph, L-keys, Help, Pause, Print Screen, reset with
-// Stop and A held, bell, click) plus the Sun protocol's idle byte, key
+// Stop and A held, bell, click, plus the Sun protocol's idle byte, key
 // repeats, the ESCC withholding its ready, and a sample of the key table.
 // BYTE_CLKS is small here (400); the pacing checks use it.
 

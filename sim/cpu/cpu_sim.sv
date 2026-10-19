@@ -27,8 +27,7 @@ module cpu_sim
   import mem_pkg::*;
 #(
   parameter string ROM = "tests/cpu/out/ss20/cputest.rom",
-  parameter bit     HALF   = 1'b0,
-  parameter int     RESNOOP = 128,        // the shim's delayed second DMA snoop (bus cycles; -GRESNOOP=0 turns it off)
+  parameter int     RESNOOP = 128,        // the delayed second DMA snoop (bus cycles; -GRESNOOP=0 turns it off)
   parameter longint CYCLES = 400_000_000
 );
   logic clk, rst;
@@ -39,57 +38,27 @@ module cpu_sim
   mem_req_t mr;                      // the interconnect model's side
   mem_rsp_t ms;
   snoop_t   sn;
-  mem_req_t cmr;                     // the module's side: the same, or through PLOMB with +plomb
-  mem_rsp_t cms;
-  snoop_t   csn;
+  snoop_t   csn;                     // the snoops the module sees (through u_dsnq)
   logic     wd_reset, si_reset, halt;
+  logic     cpu_clk;
+  assign cpu_clk = clk;
 
-  // HALF (run.sh: +half): the module on a clock of half the frequency (the
-  // hybrid's first board proof runs it so), through the shim. The module's
-  // clock is a toggle flop, as in the hybrid: in the simulator the module
-  // then evaluates after the bus domain's registers have updated, which is
-  // what the flop-made clock's insertion delay does in hardware — the shim
-  // must show the module only registers loaded at the other bus edge.
-  // cpu_edge marks the clk cycle that ends on a module clock edge, cpu_ld
-  // the one that ends on the other edge.
-  logic use_plomb, jitter, raw;
-  initial begin
-    use_plomb = $test$plusargs("plomb") || HALF;
-    jitter    = $test$plusargs("jitter");
-    raw       = $test$plusargs("raw");          // the slave lets reads overtake writes
-  end
-  logic ph, cpu_clk, cpu_edge, cpu_ld;
-  initial ph = 0;
-  always @(posedge clk) ph <= ~ph;
-  if (HALF) begin : g_half
-    assign cpu_clk  = ph;                  // rises at the end of a ph = 0 cycle
-    assign cpu_edge = ~ph;
-    assign cpu_ld   = ph;
-  end else begin : g_full
-    assign cpu_clk  = clk;
-    assign cpu_edge = 1'b1;
-    assign cpu_ld   = 1'b1;
-  end
-
-  // The module's snoop hold: honoured by the shim's queue (+plomb); the
-  // direct interconnect model broadcasts the module's own writes only, at
-  // most one every few cycles, which the caches always keep up with.
+  // The module's snoop hold, honoured by the snoop queue (u_dsnq).
   logic     c_hold, c_hold_q;
   always_ff @(posedge cpu_clk) c_hold_q <= c_hold;
 
   logic boot_mode;                    // (the harness's memory model has no PROM pace)
   cpu_module #(.HAS_FPU(1'b1)) u_cpu (
     .clk(cpu_clk), .rst, .mid_i(4'd8), .irl_i(h_irl), .cache_en_i(1'b1), .ram_mb_i(12'd16),
-    .mem_req_o(cmr), .mem_rsp_i(cms), .snoop_i(csn), .snoop_hold_o(c_hold),
+    .mem_req_o(mr), .mem_rsp_i(ms), .snoop_i(csn), .snoop_hold_o(c_hold),
     .wd_reset_o(wd_reset), .si_reset_o(si_reset), .halt_o(halt), .boot_mode_o(boot_mode),
     .dbg_commit_o(dbg_commit), .dbg_trap_o(dbg_trap), .dbg_tt_o(dbg_tt), .dbg_pc_o(dbg_pc),
     .dbg_psr_o(dbg_psr), .dbg_w_o(dbg_w));
 
-  // the board's hang reporter, as cpu_plomb has it (+hangdump prints its
+  // the board's hang reporter, as ss20_machine has it (+hangdump prints its
   // line, decoded from its serial output; it fires after 2^20 cycles
   // without a commit or 2^26 without a trap)
   logic        dbg_commit, dbg_trap, dbg_txd, dbg_act;
-  logic [15:0] pbm_dbg;
   logic [7:0]  dbg_tt;
   logic [31:0] dbg_pc, dbg_psr;
   logic [5:0][31:0] dbg_w;
@@ -117,8 +86,8 @@ module cpu_sim
   // (module ID 0) in the same cycle, as the interconnect does for a DMA
   // write; it waits while the snoop queue is nearly full (a real DMA master
   // never writes faster than a line per eight bus cycles). +dmalag=N: each
-  // line reaches the RAM N cycles after its snoop (the hybrid's memory path,
-  // where the bus accepts a DMA write well before the DDR has it).
+  // line reaches the RAM N cycles after its snoop (a memory path where the
+  // bus accepts a DMA write well before the DDR has it).
   logic        dma_run, dma_step, dma_wr, dma_full;
   logic [30:0] dma_line;
   logic [35:0] dma_dst;
@@ -150,48 +119,8 @@ module cpu_sim
     endcase
   end
 
-  // ---- +plomb: the hybrid's bus shim between the module and the interconnect ----
-  // (+jitter: the slave stalls acceptance and responses at random)
-  mem_req_t pb_in, pmr;
-  mem_rsp_t pms;
-  snoop_t   psn;
-  logic        pb_req, pb_cont, pb_cache, pb_lock, pb_dack, pb_ack, pb_dreq;
-  logic [31:0] pb_a, pb_d, pb_rd;
-  logic [3:0]  pb_ah, pb_be;
-  logic [7:0]  pb_asi;
-  logic [1:0]  pb_mode, pb_burst, pb_code;
-  assign pb_in = use_plomb ? cmr : '0;
-  logic        psn_valid, psn_full;
-  logic [30:0] psn_line;
-  snoop_t   psn_b;                         // the snoop register the shim side builds (as cpu_plomb does)
-  snoop_queue #(.DEPTH(16), .OWN_MID(4'd8), .DMA_MID(4'd0), .RESNOOP(RESNOOP), .RW(512)) u_snq (
-    .clk, .rst, .ld_i(cpu_ld), .hold_i(c_hold_q),
-    .own_valid_i(psn_valid), .own_line_i(psn_line),
-    .dma_valid_i(dma_wr), .dma_line_i(dma_line),
-    .full_o(psn_full), .snoop_o(psn_b));
-  // cpu_plomb's CPU-domain registers on both directions (FIN_EDGES 3)
-  mem_req_t pb_in_q;
-  mem_rsp_t pms_b;
-  always_ff @(posedge cpu_clk) begin
-    pb_in_q <= pb_in;
-    pms     <= pms_b;
-    psn     <= psn_b;
-  end
-  plomb_master #(.FIN_EDGES(3)) u_pbm (
-    .clk, .rst, .cpu_edge_i(cpu_edge), .cpu_ld_i(cpu_ld), .req_i(pb_in_q), .rsp_o(pms_b),
-    .sn_valid_o(psn_valid), .sn_line_o(psn_line), .sn_full_i(psn_full),
-    .pb_req, .pb_a, .pb_ah, .pb_asi, .pb_d, .pb_be, .pb_mode, .pb_burst, .pb_cont, .pb_cache, .pb_lock, .pb_dack,
-    .pb_ack, .pb_dreq, .pb_rd, .pb_code, .dbg_o(pbm_dbg));
-  plomb_slave_model u_pbs (
-    .clk, .rst, .jitter, .raw,
-    .pb_req, .pb_a, .pb_ah, .pb_d, .pb_be, .pb_mode, .pb_dack,
-    .pb_ack, .pb_dreq, .pb_rd, .pb_code,
-    .mem_req_o(pmr), .mem_rsp_i(ms));
-  assign mr  = use_plomb ? pmr : cmr;
-  assign cms = use_plomb ? pms : ms;
-  // The direct interconnect's snoop broadcast: the model's own writes and
-  // the DMA engine's lines through the same queue as the hybrid's (which
-  // honours the module's hold)
+  // The interconnect's snoop broadcast: the model's own writes and the DMA
+  // engine's lines through one queue (which honours the module's hold)
   snoop_t dsn;
   logic   dsn_full;
   snoop_queue #(.DEPTH(16), .OWN_MID(4'd8), .DMA_MID(4'd0), .RESNOOP(RESNOOP), .RW(512)) u_dsnq (
@@ -199,8 +128,8 @@ module cpu_sim
     .own_valid_i(sn.valid), .own_line_i(sn.line),
     .dma_valid_i(dma_wr), .dma_line_i(dma_line),
     .full_o(dsn_full), .snoop_o(dsn));
-  assign csn      = use_plomb ? psn : dsn;
-  assign dma_full = use_plomb ? psn_full : dsn_full;
+  assign csn      = dsn;
+  assign dma_full = dsn_full;
 
   // ---- memories ----
   logic [31:0] rom [0:262143];       // 1 MB of words

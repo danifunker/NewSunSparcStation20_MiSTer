@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 //
-// nvram_sd: the NVRAM (M48T08, 8 KB) saved to an image file on the SD card
-// (legacy TOD-6). SystemVerilog port of rtl/mister/nvram_sd.vhd (ours),
-// with the IDPROM duties the old ts_rtc RAM had (and that the hybrid's
-// m48t08_pvc wrapper carried) folded in, so that it sits directly on the
-// image port of rtl/obio/m48t08.sv.
+// nvram_sd: the NVRAM (M48T08, 8 KB) saved to an image file on the SD card,
+// with the IDPROM duties folded in, so that it sits directly on the image
+// port of rtl/obio/m48t08.sv.
 //
 // One hps_io block device: the OSD's "NVRAM" slot (SD slot 3), an 8192-byte
 // file. Main remembers the file and mounts it again at every core load,
@@ -28,7 +26,7 @@
 // the clock and returns the clock on image reads, so a saved image carries
 // the time).
 //
-// The IDPROM (Sun-4M §9.3.1; legacy plan C4, requirement ID). The built-in
+// The IDPROM (Sun-4M §9.3.1; requirement ID). The built-in
 // one is 16 bytes at 0x1FD8:
 //   01 MACHINE 08 00 20 S2 S1 S0 00 00 00 00 S2 S1 S0 CK
 // format 1, the machine type (0x72 = SS20), the Ethernet address
@@ -79,18 +77,14 @@
 // master may drop req within the ack cycle).
 //
 // `por` returns the block to its power-up state (the power-up IDPROM
-// write included). The VHDL had no reset: the NVRAM's image must survive
-// an OSD or software reset, so tie `por` to 0 in the machine (or to a
+// write included). The NVRAM's image must survive an OSD or software
+// reset, so tie `por` to 0 in the machine (or to a
 // configuration-time reset); it is there for the benches.
 //
-// Differences from the VHDL/old-RAM pair, all harmless:
-//  - a blank image's IDPROM is replaced as a whole when the format byte is
-//    0; the old RAM replaced each zero halfword of the 16 bytes on its own,
-//    which would also have rewritten zero halfwords of a valid IDPROM (a
-//    serial with two zero bytes, for instance). A non-blank image now loads
-//    byte for byte;
-//  - a CPU write marks its sector dirty in the cycle the RAM takes it
-//    (the old RAM reported it a cycle after its ack).
+// A blank image's IDPROM is replaced as a whole when the format byte is 0
+// (a valid IDPROM with zero halfwords is left alone); a non-blank image
+// loads byte for byte. A CPU write marks its sector dirty in the cycle the
+// RAM takes it.
 
 module nvram_sd
   import iobus_pkg::*;
@@ -150,8 +144,7 @@ module nvram_sd
 
   typedef enum logic [1:0] {S_IDLE, S_REQ, S_XFER} state_t;
 
-  // Power-up values (the FPGA's configuration, as the VHDL's signal
-  // initialisers): there is no machine reset here, only `por`.
+  // Power-up values (the FPGA's configuration): there is no machine reset here, only `por`.
   /* verilator lint_off PROCASSINIT */
   state_t          state        = S_IDLE;
   logic            ena          = 1'b0;   // an image is connected

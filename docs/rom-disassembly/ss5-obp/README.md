@@ -1,7 +1,7 @@
 # SPARCstation 5 boot PROM (`ss5.bin`) — machine-code side
 
-Phase 1 of [`docs/REWORK.md`](../../legacy/REWORK.md). This folder documents the
-SPARCstation 5 OpenBoot PROM that the core's SS5 build is meant to run: its
+This folder documents the
+SPARCstation 5 OpenBoot PROM: its
 image map, how the CPU enters it, the reset flow up to the first Forth word,
 trap handling, and the power-on self-test (POST). Companion files:
 
@@ -441,15 +441,13 @@ aliases that only apply to jump/call targets).
    QEMU also fails IOMMU Control Reg, FPU SP Trap Priority <, both timer
    tests, DMA2 E_CSR (and, by construction, the other slave-error tests) and
    TOD Registers ([`post-tests.md`](post-tests.md) §13).
-8. Found in passing, for phase 2/4 (quick look only): the core decodes ASI 4
-   with VA[11:8] (`rtl/cpu/mcu_simple.vhd:970`, `mcu_multi.vhd:1045`), so the
-   microSPARC-II registers at `0x1000` (TLB replacement control), `0x1300` and
-   `0x1400` (SFSR/SFAR diagnostic) alias the PCR, SFSR and SFAR. The PROM
-   writes `0` to `[0x1000] 4` in `tlb_init_clear` while still in boot mode;
-   on the core that clears PCR.BM and would move instruction fetch from the
-   PROM to RAM. ASI 5/6/7 (TLB diagnostics) are ignored, so the POST fails at
-   test 6 as under QEMU. The core's SS5 decoder puts the PROM at PA
-   `0xFxxxxxxx` (`rtl/sun4m/ts_decode.vhd:79-81`) and its boot-mode fetch at
-   `0xFF`+VA[27:0]; this image reads itself at PA `0x7000xxxx` with ASI 0x20
-   and OBP maps the PROM from PA `0x70000000`, so running it needs the PROM
-   decoded there too ([`hardware-access.md`](hardware-access.md) §5).
+8. The microSPARC-II ASI 4 registers at `0x1000` (TLB replacement control),
+   `0x1300` and `0x1400` (SFSR/SFAR diagnostic) need the full VA decoded: a
+   decoder that looks only at VA[11:8] aliases them onto the PCR, SFSR and
+   SFAR. The PROM writes `0` to `[0x1000] 4` in `tlb_init_clear` while still
+   in boot mode, which on such a decoder would clear PCR.BM and move
+   instruction fetch from the PROM to RAM. Without ASI 5/6/7 (TLB
+   diagnostics) the POST fails at test 6 as under QEMU. This image reads
+   itself at PA `0x7000xxxx` with ASI 0x20 and OBP maps the PROM from PA
+   `0x70000000`, so running it needs the PROM decoded there
+   ([`hardware-access.md`](hardware-access.md) §5).
