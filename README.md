@@ -26,6 +26,43 @@ skip). Where the work stands, and what is next:
 [docs/sessions/HANDOFF-20261009.md](docs/sessions/HANDOFF-20261009.md)
 ("Current state" at the top); the phases: [docs/VERILOG-PLAN.md](docs/VERILOG-PLAN.md) §9.
 
+## The OSD
+
+The menu follows the computer cores' OSD standard (hp9000-715_MiSTer
+`docs/osd-standard.md`). Disks, the CD, Load ROM and the Input page act
+at once; every other setting waits for **Apply and reset** (or any other
+reset), and "Changes pending" shows until then.
+
+```
+SunSparcStation
+  Pri. disk (ID 3)     <- the disk the PROM boots by default
+  Disk (ID 1)
+  CD-ROM (ID 6)
+  Load ROM             <- this session only; a normal start loads boot.rom
+  Memory               464MB, 256MB, 128MB, 64MB
+  Network interface    eth0, None, eth1, macvlan, tap0
+  Video     (P2)       Display (Graphics / Serial console), Aspect ratio, Scale
+  Input     (P3)       Keyboard layout, Swap Alt/Win keys
+  Advanced  (P5)       Autoboot, NVRAM image
+   Changes pending
+  Apply and reset
+```
+
+`Pri.` names the default: the PROM's `boot-device` (NVRAM) can boot
+another disk, the CD or the network. Load ROM is not remembered, so an
+MGL can start the core with another ROM (Sun's OBP, the CPU suite) without
+changing the default:
+
+```xml
+<mistergamedescription>
+  <rbf>_Unstable/SunSparcStation20</rbf>
+  <file delay="1" type="f" index="0" path="../../../../games/SunSparcStation/obp225.rom"/>
+</mistergamedescription>
+```
+
+To make another ROM the default, copy it to
+`games/SunSparcStation/boot.rom`.
+
 ## What is here
 
 | Path | What | License |

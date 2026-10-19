@@ -36,7 +36,8 @@ push() {   # local remote
 }
 if [ -n "$ROM" ]; then
     push "$ROM" "$GAMES/boot.rom" || exit 1
-    # a Boot PROM chosen in the OSD (config/<core>.f0) would replace it
+    # a Boot PROM record left by a build before the OSD standard
+    # (FC0, config/<core>.f0) would replace it
     ssh "${SSH_OPTS[@]}" "$DEV" "rm -f /media/fat/config/$GAMES_DIR.f0"
 fi
 ssh "${SSH_OPTS[@]}" "$DEV" "test -f '$GAMES/boot.rom'" || log "warning: no $GAMES/boot.rom on the MiSTer"

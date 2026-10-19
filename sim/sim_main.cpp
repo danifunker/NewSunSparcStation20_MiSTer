@@ -655,7 +655,7 @@ int main(int argc, char **argv) {
         uint32_t st0 = 0;
         if (noautoboot) st0 |= 1u << 8;     // Auto boot Off
         if (!video) st0 |= 1u << 9;         // console on ttya
-        if (cg3) st0 |= 1u << 10;           // CG3
+        if (cg3) st0 |= 1u << 10;           // CG3 (not offered: ss20_osd forces TCX)
         if (!l2tlb) st0 |= 1u << 17;        // L2 TLB Off (the board's default is On)
         if (!eth) st0 |= 1u << 24;          // Network Off (value 1)
         st0 |= (uint32_t)ram_sel << 22;     // memory: 464, 256, 128, 64 MB

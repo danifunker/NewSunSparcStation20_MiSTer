@@ -24,10 +24,10 @@ G="/media/fat/games/$GAMES_DIR"
 
 rsh() { ssh "${SSH_OPTS[@]}" "$DEV" "$@"; }
 
-# A Boot PROM chosen in the OSD (CONF_STR FC0, remembered in
-# config/<core>.f0) replaces boot0.rom/boot.rom at every core start: the
-# tests set boot.rom, so the choice is forgotten first (KEEP_PROM=1 keeps it;
-# mount.sh --prom sets it)
+# The OSD's Load ROM (CONF_STR F0) is not remembered, so every start loads
+# boot.rom, the ROM the tests set. Builds before the OSD standard remembered
+# it (FC0, config/<core>.f0): a record left by one is removed first
+# (KEEP_PROM=1 keeps it)
 core_start() {
     [ "${KEEP_PROM:-0}" = 1 ] || rsh "rm -f /media/fat/config/$GAMES_DIR.f0"
     rsh "echo 'load_core /media/fat/$MISTER_CORE_FOLDER/${1:-SunSparcStation20}.rbf' > /dev/MiSTer_cmd"

@@ -4,21 +4,26 @@
 # MiSTer keeps a core's OSD state in /media/fat/config/<CORENAME>.CFG: the
 # 128-bit status word, 16 bytes, bit N in byte N/8 bit N%8. It is read when the
 # core starts, so this writes the file and the caller relaunches the core.
-# Names follow CONF_STR in SunSparcStation.sv; keep them in step.
+# Names follow CONF_STR in SunSparcStation.sv (and rtl/machine/ss20_osd.sv);
+# keep them in step.
 #
-#   aspect=4:3|full|arc1|arc2 O[7:6]  (Video)
-#   scale=normal|vint|hvint-|hvint+ O[15:14] (Video)
-#   autoboot=on|off          O[8]    (System)
-#   console=video|serial     O[9]    the console (System)
-#   video=tcx|cg3            O[10]   graphics card (Video)
-#   kbd=us|fr|de|es          O[13:12] (System)
-#   l2tlb=on|off             O[17]   (Advanced; On is the default since 2026-10-06)
-#   iommu=26|11|23|30        O[21:20] SS5 (Advanced; fixed at 26 on the SS20)
-#   memory=464|256|128|64    O[23:22] SS20 (System)
-#   network=eth0|off|eth1|macvlan|tap0 O[26:24] (System; Main's sun_enet)
+#   memory=464|256|128|64    O[23:22] Memory (top page)
+#   network=eth0|none|eth1|macvlan|tap0 O[26:24] Network interface (top page;
+#                            Main's sun_enet; "off" is the old name of none)
+#   console=video|serial     O[9]    Display (P2 Video)
+#   aspect=4:3|full|arc1|arc2 O[7:6]  Aspect ratio (P2 Video)
+#   scale=vint|normal|hvint-|hvint+|hvint O[30:28] Scale (P2 Video)
+#   kbd=us|fr|de|es          O[13:12] Keyboard layout (P3 Input)
+#   swap=no|yes              O[27]   Swap Alt/Win keys (P3 Input)
+#   autoboot=on|off          O[8]    Autoboot (P5 Advanced)
+# Not in the OSD, meaning kept (the core ignores them for now):
+#   video=tcx|cg3            O[10]   no CG3 in this core: always TCX
+#   l2tlb=on|off             O[17]   no L2 TLB in this core yet
+#   iommu=26|11|23|30        O[21:20] SS5 only
 # The disks and the CD are always there (a disk while its image is
 # mounted). Retired: O[1] (two disks), O[4] (CD block size), O[5] (CD off),
-# O[11] (framebuffer output), O[16] (cache), O[18] (write-back), O[19].
+# O[11] (framebuffer output), O[15:14] (the old Scale), O[16] (cache),
+# O[18] (write-back), O[19].
 #
 #   scripts/setopt.sh console=serial kbd=fr
 #   scripts/setopt.sh            # all defaults
@@ -38,11 +43,12 @@ F = {
     "console":  (9, 1, {"video": 0, "serial": 1}),
     "video":    (10, 1, {"tcx": 0, "cg3": 1}),
     "kbd":      (12, 2, {"us": 0, "fr": 1, "de": 2, "es": 3}),
-    "scale":    (14, 2, {"normal": 0, "vint": 1, "hvint-": 2, "hvint+": 3}),
+    "scale":    (28, 3, {"vint": 0, "normal": 1, "hvint-": 2, "hvint+": 3, "hvint": 4}),
+    "swap":     (27, 1, {"no": 0, "yes": 1}),
     "l2tlb":    (17, 1, {"on": 0, "off": 1}),
     "iommu":    (20, 2, {"26": 0, "11": 1, "23": 2, "30": 3}),
     "memory":   (22, 2, {"464": 0, "256": 1, "128": 2, "64": 3}),
-    "network":  (24, 3, {"eth0": 0, "off": 1, "eth1": 2, "macvlan": 3, "tap0": 4}),
+    "network":  (24, 3, {"eth0": 0, "none": 1, "off": 1, "eth1": 2, "macvlan": 3, "tap0": 4}),
 }
 st = 0
 for a in sys.argv[1:]:

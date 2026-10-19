@@ -152,7 +152,8 @@ run_capture() {
     scripts/console.sh --seconds "$secs" --out "$log" > /dev/null 2>&1 &
     local cp=$!
     sleep 3
-    # boot.rom is the ROM under test: forget a Boot PROM chosen in the OSD
+    # boot.rom is the ROM under test: remove a Boot PROM record left by a
+    # build before the OSD standard (FC0; Load ROM is F0, not remembered)
     rsh "rm -f /media/fat/config/$GAMES_DIR.f0"
     rsh "echo 'load_core /media/fat/$MISTER_CORE_FOLDER/$REV.rbf' > /dev/MiSTer_cmd"
     local t=0

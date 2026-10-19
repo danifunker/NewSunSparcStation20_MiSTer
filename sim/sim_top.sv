@@ -80,16 +80,31 @@ wire       opt_autoboot, opt_serial, opt_cg3, opt_l2tlb, opt_eth;
 wire [7:0] opt_kbd_layout;
 wire [9:0] opt_ram_mb;
 
+// The video options and the pending flag have no use here.
+/* verilator lint_off UNUSEDSIGNAL */
+wire        osd_pending;
+wire  [1:0] osd_ar;
+wire  [2:0] osd_scale;
+wire [10:0] osd_ps2_key;
+/* verilator lint_on UNUSEDSIGNAL */
+
 ss20_osd osd
 (
+	.clk(clk),
+	.rst(reset),
 	.status_i(status),
+	.ps2_key_i(11'd0),
+	.pending_o(osd_pending),
 	.autoboot_o(opt_autoboot),
 	.serial_o(opt_serial),
 	.cg3_o(opt_cg3),
 	.kbd_layout_o(opt_kbd_layout),
+	.ps2_key_o(osd_ps2_key),
 	.l2tlb_o(opt_l2tlb),
 	.ram_mb_o(opt_ram_mb),
-	.eth_o(opt_eth)
+	.eth_o(opt_eth),
+	.ar_o(osd_ar),
+	.scale_o(osd_scale)
 );
 
 wire [31:0] sd_lba[4];

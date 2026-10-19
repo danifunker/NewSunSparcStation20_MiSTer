@@ -49,51 +49,63 @@ assign BUTTONS   = 2'd0;
 //////////////////////////////////////////////////////////////////////////////
 // OSD
 //
+// The layout is the computer cores' OSD standard (hp9000-715_MiSTer
+// docs/osd-standard.md): the top page holds the media, Memory and Network
+// interface, the submenus (P2 Video, P3 Input, P5 Advanced) and Apply and
+// reset. The media and the Input page act at once; every other setting is
+// taken at the next reset (ss20_osd latches it), and "Changes pending"
+// shows until then.
+//
 // The status bits are the VHDL core's (rtl/machine/ss20_osd.sv lists them,
 // with the retired ones that must stay unused). Option text may change; a
 // bit's meaning may not.
 //
-// "FC0" is the Boot PROM: Main remembers the file (config/<core>.f0) and
-// sends it as index 0 at every start in place of boot0.rom/boot.rom. Keep
-// its extension list to ROM alone: a second extension would be sent as
-// index 0x40 | 0 = 64, the ID PROM's index.
+// "F0" is Load ROM: not remembered, so a normal start loads
+// games/SunSparcStation/boot0.rom or boot.rom, and Load ROM or an MGL picks
+// another ROM for that session. Keep its extension list to ROM alone: a
+// second extension would be sent as index 0x40 | 0 = 64, the ID PROM's
+// index. It stays on the top page: an MGL finds only the rows drawn there.
 // "SC0"-"SC3": the C makes Main remember the image (config/<core>.s<n>) and
-// mount it again at the next start. Slot 2 is the CD (Main's sun_cdrom
-// translates CUE/CHD), slot 3 the NVRAM image.
+// mount it again at the next start. Slots 0 and 1 are the disks at SCSI IDs
+// 3 and 1, slot 2 the CD at ID 6 (Main's sun_cdrom translates CUE/CHD),
+// slot 3 the NVRAM image.
 
 `include "build_id.v"
 localparam CONF_STR = {
 	"SunSparcStation;;",
 	"-;",
-	"FC0,ROM,Boot PROM;",
-	"SC0,VHDIMGHDARAW,Disk 0;",
-	"SC1,VHDIMGHDARAW,Disk 1;",
-	"SC2,ISOCUECHD,CD-ROM;",
-	"SC3,NVR,NVRAM;",
+	"SC0,VHDIMGHDARAW,Pri. disk (ID 3);",
+	"SC1,VHDIMGHDARAW,Disk (ID 1);",
+	"SC2,ISOCUECHD,CD-ROM (ID 6);",
+	"F0,ROM,Load ROM;",
 	"-;",
-	"O[8],Auto boot,On,Off;",
+	"O[23:22],Memory,464MB,256MB,128MB,64MB;",
+	"O[26:24],Network interface,eth0,None,eth1,macvlan,tap0;",
 	"-;",
-	"P1,Video;",
-	"P1-;",
-	"P1O[10],Graphics,TCX,CG3;",
-	"P1O[7:6],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
-	"P1O[15:14],Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
-	"P2,System;",
-	"P2-;",
-	"P2O[9],Console,Screen,Serial (ttya);",
-	"P2O[13:12],Keyboard,US,French,German,Spanish;",
-	"P2O[23:22],Memory,464 MB,256 MB,128 MB,64 MB;",
-	"P2O[26:24],Network,eth0,Off,eth1,macvlan,tap0;",
-	"P3,Advanced;",
-	"P3-;",
-	"P3O[17],L2 TLB,On,Off;",
+	"P2,Video;",
+	"P3,Input;",
+	"P5,Advanced;",
 	"-;",
-	"R[0],Reset;",
+	"h0-,Changes pending;",
+	"R[0],Apply and reset;",
+
+	"P2O[9],Display,Graphics,Serial console;",
+	"P2O[7:6],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
+	"P2O[30:28],Scale,V-Integer,Normal,Narrower HV-Integer,Wider HV-Integer,HV-Integer;",
+
+	"P3O[13:12],Keyboard layout,US,French,German,Spanish;",
+	"P3O[27],Swap Alt/Win keys,No,Yes;",
+
+	"P5O[8],Autoboot,On,Off;",
+	"P5-;",
+	"P5SC3,NVR,NVRAM image;",
+
 	"V,v",`BUILD_DATE
 };
 
 wire         clk_sys, clk_vid, pll_locked;
 wire [127:0] status;
+wire         osd_pending;
 wire   [1:0] buttons;
 
 wire        ioctl_download;
@@ -130,7 +142,7 @@ hps_io #(.CONF_STR(CONF_STR), .WIDE(1), .VDNUM(4), .BLKSZ(2)) hps_io
 
 	.buttons(buttons),
 	.status(status),
-	.status_menumask(16'd0),
+	.status_menumask({15'd0, osd_pending}),
 
 	.ioctl_download(ioctl_download),
 	.ioctl_index(ioctl_index),
@@ -160,22 +172,6 @@ hps_io #(.CONF_STR(CONF_STR), .WIDE(1), .VDNUM(4), .BLKSZ(2)) hps_io
 	.ps2_kbd_led_use(kbd_led_use)
 );
 
-wire       opt_autoboot, opt_serial, opt_cg3, opt_l2tlb, opt_eth;
-wire [7:0] opt_kbd_layout;
-wire [9:0] opt_ram_mb;
-
-ss20_osd osd
-(
-	.status_i(status),
-	.autoboot_o(opt_autoboot),
-	.serial_o(opt_serial),
-	.cg3_o(opt_cg3),
-	.kbd_layout_o(opt_kbd_layout),
-	.l2tlb_o(opt_l2tlb),
-	.ram_mb_o(opt_ram_mb),
-	.eth_o(opt_eth)
-);
-
 //////////////////////////////////////////////////////////////////////////////
 // Clocks and reset
 
@@ -193,6 +189,33 @@ pll pll
 reg [1:0] reset_s = 2'b11;
 always @(posedge clk_sys) reset_s <= {reset_s[0], RESET | status[0] | buttons[1] | ~pll_locked};
 wire reset = reset_s[1];
+
+// The OSD's options: the settings latched at reset, the Input rows live.
+wire        opt_autoboot, opt_serial, opt_cg3, opt_l2tlb, opt_eth;
+wire  [7:0] opt_kbd_layout;
+wire  [9:0] opt_ram_mb;
+wire  [1:0] ar;
+wire  [2:0] scale;
+wire [10:0] ps2_key_m;
+
+ss20_osd osd
+(
+	.clk(clk_sys),
+	.rst(reset),
+	.status_i(status),
+	.ps2_key_i(ps2_key),
+	.pending_o(osd_pending),
+	.autoboot_o(opt_autoboot),
+	.serial_o(opt_serial),
+	.cg3_o(opt_cg3),
+	.kbd_layout_o(opt_kbd_layout),
+	.ps2_key_o(ps2_key_m),
+	.l2tlb_o(opt_l2tlb),
+	.ram_mb_o(opt_ram_mb),
+	.eth_o(opt_eth),
+	.ar_o(ar),
+	.scale_o(scale)
+);
 
 //////////////////////////////////////////////////////////////////////////////
 // The machine
@@ -254,7 +277,7 @@ ss20_machine machine
 	.uart_dtr_o(UART_DTR),
 	.uart_dsr_i(UART_DSR),
 
-	.ps2_key_i(ps2_key),
+	.ps2_key_i(ps2_key_m),
 	.ps2_mouse_i(ps2_mouse),
 	.kbd_led_status_o(kbd_led_status),
 	.kbd_led_use_o(kbd_led_use),
@@ -289,9 +312,9 @@ assign VGA_B     = vid_b;
 assign VGA_HS    = vid_hs;
 assign VGA_VS    = vid_vs;
 
-// Aspect ratio and integer scaling for the HDMI scaler. The screen is
-// 1024x768 with square pixels, so "Original" is 4:3.
-wire [1:0] ar = status[7:6];
+// Aspect ratio and integer scaling for the HDMI scaler (ss20_osd takes
+// them at reset). The screen is 1024x768 with square pixels, so "Original"
+// is 4:3.
 
 video_freak video_freak
 (
@@ -309,7 +332,7 @@ video_freak video_freak
 	.ARY((!ar) ? 12'd3 : 12'd0),
 	.CROP_SIZE(12'd0),
 	.CROP_OFF(5'd0),
-	.SCALE({1'b0, status[15:14]})
+	.SCALE(scale)
 );
 
 endmodule
