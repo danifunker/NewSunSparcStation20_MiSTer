@@ -68,6 +68,8 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/sun4m/cs4231.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/sun4m/kbd_beep.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/machine/ss20_machine.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mister/ddram_arb.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/mister/sdram64.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/machine/vram_sdram.sv
 set_global_assignment -name QIP_FILE rtl/pll.qip
 set_global_assignment -name SDC_FILE SunSparcStation.sdc
 set_global_assignment -name SYSTEMVERILOG_FILE SunSparcStation.sv

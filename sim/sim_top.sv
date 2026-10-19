@@ -129,6 +129,22 @@ wire       vid_ce, uart_rts, uart_dtr;
 wire [2:0] kbd_led_status, kbd_led_use;
 wire [15:0] audio_l, audio_r;
 
+// The SDRAM module's first rank (sim/sdram_chip.sv: protocol and timing
+// checked, an error printed)
+wire  [15:0] sdram_dq;
+wire  [12:0] sdram_a;
+wire   [1:0] sdram_ba;
+wire         sdram_dqml, sdram_dqmh, sdram_ncs, sdram_nras, sdram_ncas, sdram_nwe;
+/* verilator lint_off UNUSEDSIGNAL */
+wire         sdram_cke;
+/* verilator lint_on UNUSEDSIGNAL */
+sdram_chip #(.INV_CS(0)) sdram
+(
+	.clk(clk), .nCS(sdram_ncs), .nRAS(sdram_nras), .nCAS(sdram_ncas), .nWE(sdram_nwe),
+	.ba(sdram_ba), .a(sdram_a), .dqmh(sdram_dqmh), .dqml(sdram_dqml), .dq(sdram_dq),
+	.ctl_drives(machine.u_sdram.dq_oe)
+);
+
 ss20_machine #(.SKIP_CLEAR(1'b1), .NCPU(NCPU)) machine
 (
 	.clk(clk),
@@ -152,6 +168,21 @@ ss20_machine #(.SKIP_CLEAR(1'b1), .NCPU(NCPU)) machine
 	.ddr_be_o(ddr_be),
 	.ddr_dout_i(ddr_dout),
 	.ddr_dout_ready_i(ddr_dout_ready),
+
+	// the SDRAM (the TCX's VRAM): the chip model below, its clock in phase
+	// with clk, so the capture point is rd_mode 3 (sdram64's notes)
+	.clk_sdram(clk),
+	.sdram_rd_mode_i(2'd3),
+	.sdram_dq(sdram_dq),
+	.sdram_a(sdram_a),
+	.sdram_ba(sdram_ba),
+	.sdram_dqml(sdram_dqml),
+	.sdram_dqmh(sdram_dqmh),
+	.sdram_ncs(sdram_ncs),
+	.sdram_nras(sdram_nras),
+	.sdram_ncas(sdram_ncas),
+	.sdram_nwe(sdram_nwe),
+	.sdram_cke(sdram_cke),
 
 	.ioctl_download_i(ioctl_download),
 	.ioctl_index_i(ioctl_index),

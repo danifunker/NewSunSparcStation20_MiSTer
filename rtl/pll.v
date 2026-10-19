@@ -6,6 +6,9 @@
 //
 //   outclk_0  55 MHz  clk_sys: the machine, hps_io, DDR3 (plan §1.3: >= 55)
 //   outclk_1  65 MHz  clk_vid: the pixel clock, 1024x768 at 60 Hz (VESA)
+//   outclk_2  55 MHz  clk_sdram: clk_sys + 270 degrees (13.636 ns, 78 steps
+//                     of the 715 MHz VCO's eighth), the SDRAM's clock
+//                     (sdram64; SDRAM_CLK through a DDIO register)
 //
 // The instance in emu must stay named "pll" with "pll_inst" inside:
 // sys/sys_top.sdc and SunSparcStation.sdc find the clocks by that path.
@@ -16,6 +19,7 @@ module pll (
 		input  wire  rst,
 		output wire  outclk_0,
 		output wire  outclk_1,
+		output wire  outclk_2,
 		output wire  locked
 	);
 
@@ -24,6 +28,7 @@ module pll (
 		.rst      (rst),
 		.outclk_0 (outclk_0),
 		.outclk_1 (outclk_1),
+		.outclk_2 (outclk_2),
 		.locked   (locked)
 	);
 

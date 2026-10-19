@@ -25,8 +25,6 @@ module emu
 assign ADC_BUS  = 'Z;
 assign USER_OUT = '1;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
-assign {SDRAM_DQ, SDRAM_A, SDRAM_BA, SDRAM_CLK, SDRAM_CKE, SDRAM_DQML, SDRAM_DQMH,
-        SDRAM_nWE, SDRAM_nCAS, SDRAM_nRAS, SDRAM_nCS} = 'Z;
 `ifdef MISTER_DUAL_SDRAM
 assign {SDRAM2_CLK, SDRAM2_A, SDRAM2_BA, SDRAM2_DQ, SDRAM2_nCS,
         SDRAM2_nCAS, SDRAM2_nRAS, SDRAM2_nWE} = 'Z;
@@ -103,7 +101,7 @@ localparam CONF_STR = {
 	"V,v",`BUILD_DATE
 };
 
-wire         clk_sys, clk_vid, pll_locked;
+wire         clk_sys, clk_vid, clk_sdram, pll_locked;
 wire [127:0] status;
 wire         osd_pending;
 wire   [1:0] buttons;
@@ -181,7 +179,18 @@ pll pll
 	.rst(1'b0),
 	.outclk_0(clk_sys),
 	.outclk_1(clk_vid),
+	.outclk_2(clk_sdram),
 	.locked(pll_locked)
+);
+
+// SDRAM_CLK: clk_sdram (clk_sys + 270 degrees) through a DDIO output
+// register, as every MiSTer core drives it
+altddio_out #(
+	.extend_oe_disable("OFF"), .intended_device_family("Cyclone V"), .invert_output("OFF"),
+	.lpm_hint("UNUSED"), .lpm_type("altddio_out"), .oe_reg("UNREGISTERED"), .power_up_high("OFF"), .width(1)
+) sdramclk_ddr (
+	.datain_h(1'b1), .datain_l(1'b0), .outclock(clk_sdram), .dataout(SDRAM_CLK),
+	.aclr(1'b0), .aset(1'b0), .oe(1'b1), .outclocken(1'b1), .sclr(1'b0), .sset(1'b0)
 );
 
 // RESET and the OSD's Reset are asynchronous to clk_sys; the machine wants
@@ -247,6 +256,22 @@ ss20_machine machine
 	.ddr_be_o(DDRAM_BE),
 	.ddr_dout_i(DDRAM_DOUT),
 	.ddr_dout_ready_i(DDRAM_DOUT_READY),
+
+	// the SDRAM module (the TCX's VRAM). status[33:32], not in the OSD:
+	// sdram64's read capture point, for bring-up at 55 MHz (0 = clk edge 3,
+	// as at 64 MHz on the HP core; scripts/setopt.sh sdram_rd=0..3)
+	.clk_sdram(clk_sdram),
+	.sdram_rd_mode_i(status[33:32]),
+	.sdram_dq(SDRAM_DQ),
+	.sdram_a(SDRAM_A),
+	.sdram_ba(SDRAM_BA),
+	.sdram_dqml(SDRAM_DQML),
+	.sdram_dqmh(SDRAM_DQMH),
+	.sdram_ncs(SDRAM_nCS),
+	.sdram_nras(SDRAM_nRAS),
+	.sdram_ncas(SDRAM_nCAS),
+	.sdram_nwe(SDRAM_nWE),
+	.sdram_cke(SDRAM_CKE),
 
 	.ioctl_download_i(ioctl_download),
 	.ioctl_index_i(ioctl_index[7:0]),

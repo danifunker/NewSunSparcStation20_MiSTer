@@ -62,6 +62,22 @@ module ss20_machine #(
   input  logic [63:0]  ddr_dout_i,
   input  logic         ddr_dout_ready_i,
 
+  // the SDRAM module: the TCX's VRAM (rtl/machine/vram_sdram.sv,
+  // rtl/mister/sdram64.sv). SDRAM_CLK comes from the top (clk_sdram, the
+  // 270-degree copy of clk, through a DDIO register).
+  input  logic         clk_sdram,
+  input  logic [1:0]   sdram_rd_mode_i, // the read capture point (sdram64: 0 on the board)
+  inout  wire  [15:0]  sdram_dq,
+  output logic [12:0]  sdram_a,
+  output logic [1:0]   sdram_ba,
+  output logic         sdram_dqml,
+  output logic         sdram_dqmh,
+  output logic         sdram_ncs,
+  output logic         sdram_nras,
+  output logic         sdram_ncas,
+  output logic         sdram_nwe,
+  output logic         sdram_cke,
+
   // hps_io: downloads (WIDE: 16-bit words, ioctl_addr counts bytes)
   input  logic         ioctl_download_i,
   input  logic [7:0]   ioctl_index_i,
@@ -227,10 +243,10 @@ module ss20_machine #(
     .ddr_we_o(mc_we), .ddr_din_o(mc_din), .ddr_be_o(mc_be),
     .ddr_dout_i(mm_dout), .ddr_dout_ready_i(mm_rdv), .ram_acc_o(mem_acc), .fix_v_i(ecc_fix_v), .fix_bit_i(ecc_fix_bit), .state_o());
 
-  // DDR3, through two rtl/mister/ddram_arb levels: the TCX's scan-out
-  // first (it must not underrun), then the memory controller (or the
-  // loader while it works: the machine is in reset then), then the TCX's
-  // VRAM accesses.
+  // DDR3, through one rtl/mister/ddram_arb: the memory controller (or the
+  // loader while it works: the machine is in reset then) first, then the
+  // Ethernet mailbox. The TCX's VRAM and scan-out are on the SDRAM
+  // (below).
   logic        mm_rd, mm_we, mm_wait, mm_rdv;
   logic [7:0]  mm_bc, mm_be;
   logic [28:0] mm_addr;
@@ -251,7 +267,7 @@ module ss20_machine #(
   logic [7:0]  vr_bc, vr_be;
   logic [28:0] vr_addr;
   logic [63:0] vr_din, vr_dout;
-  logic        dv_rd, dv_we, dv_wait, dv_rdv;   // the TCX's VRAM and the Ethernet mailbox
+  logic        dv_rd, dv_we, dv_wait, dv_rdv;   // the Ethernet mailbox
   logic [7:0]  dv_bc, dv_be;
   logic [28:0] dv_addr;
   logic [63:0] dv_din, dv_dout;
@@ -264,15 +280,15 @@ module ss20_machine #(
   logic [28:0] lo_addr;
   logic [63:0] lo_din, lo_dout;
 
-  ddram_arb u_arb_top (
-    .clk, .reset(rst),
-    .m0_waitrequest(sc_wait), .m0_burstcount(sc_bc), .m0_address(sc_addr), .m0_read(sc_rd), .m0_write(1'b0),
-    .m0_writedata(64'd0), .m0_byteenable(8'hFF), .m0_readdata(sc_dout), .m0_readdatavalid(sc_rdv),
-    .m1_waitrequest(lo_wait), .m1_burstcount(lo_bc), .m1_address(lo_addr), .m1_read(lo_rd), .m1_write(lo_we),
-    .m1_writedata(lo_din), .m1_byteenable(lo_be), .m1_readdata(lo_dout), .m1_readdatavalid(lo_rdv),
-    .s_waitrequest(ddr_busy_i), .s_burstcount(ddr_burstcnt_o), .s_address(ddr_addr_o), .s_read(ddr_rd_o),
-    .s_write(ddr_we_o), .s_writedata(ddr_din_o), .s_byteenable(ddr_be_o), .s_readdata(ddr_dout_i),
-    .s_readdatavalid(ddr_dout_ready_i));
+  assign ddr_burstcnt_o = lo_bc;
+  assign ddr_addr_o     = lo_addr;
+  assign ddr_rd_o       = lo_rd;
+  assign ddr_we_o       = lo_we;
+  assign ddr_din_o      = lo_din;
+  assign ddr_be_o       = lo_be;
+  assign lo_wait        = ddr_busy_i;
+  assign lo_dout        = ddr_dout_i;
+  assign lo_rdv         = ddr_dout_ready_i;
 
   ddram_arb u_arb_lo (
     .clk, .reset(rst),
@@ -284,15 +300,33 @@ module ss20_machine #(
     .s_write(lo_we), .s_writedata(lo_din), .s_byteenable(lo_be), .s_readdata(lo_dout),
     .s_readdatavalid(lo_rdv));
 
-  ddram_arb u_arb_dev (
-    .clk, .reset(rst),
-    .m0_waitrequest(vr_wait), .m0_burstcount(vr_bc), .m0_address(vr_addr), .m0_read(vr_rd), .m0_write(vr_we),
-    .m0_writedata(vr_din), .m0_byteenable(vr_be), .m0_readdata(vr_dout), .m0_readdatavalid(vr_rdv),
-    .m1_waitrequest(et_wait), .m1_burstcount(et_bc), .m1_address(et_addr), .m1_read(et_rd), .m1_write(et_we),
-    .m1_writedata(et_din), .m1_byteenable(et_be), .m1_readdata(et_dout), .m1_readdatavalid(et_rdv),
-    .s_waitrequest(dv_wait), .s_burstcount(dv_bc), .s_address(dv_addr), .s_read(dv_rd),
-    .s_write(dv_we), .s_writedata(dv_din), .s_byteenable(dv_be), .s_readdata(dv_dout),
-    .s_readdatavalid(dv_rdv));
+  assign dv_bc = et_bc; assign dv_addr = et_addr; assign dv_rd = et_rd; assign dv_we = et_we;
+  assign dv_din = et_din; assign dv_be = et_be;
+  assign et_wait = dv_wait; assign et_dout = dv_dout; assign et_rdv = dv_rdv;
+
+  // The TCX's VRAM on the SDRAM: the scan-out first, then the VRAM master
+  logic        sd_req, sd_we, sd_line, sd_ack, sd_wready, sd_rvalid, sd_ready;
+  logic [26:0] sd_addr;
+  logic [7:0]  sd_be;
+  logic [63:0] sd_wdata, sd_rdata;
+  logic [1:0]  sd_rbeat;
+  vram_sdram u_vsd (
+    .clk, .rst,
+    .s_address(sc_addr), .s_burstcount(sc_bc), .s_read(sc_rd), .s_waitrequest(sc_wait),
+    .s_readdata(sc_dout), .s_readdatavalid(sc_rdv),
+    .v_address(vr_addr), .v_read(vr_rd), .v_write(vr_we), .v_writedata(vr_din), .v_byteenable(vr_be),
+    .v_waitrequest(vr_wait), .v_readdata(vr_dout), .v_readdatavalid(vr_rdv),
+    .ram_req(sd_req), .ram_we(sd_we), .ram_line(sd_line), .ram_addr(sd_addr), .ram_be(sd_be),
+    .ram_wdata(sd_wdata), .ram_ack(sd_ack), .ram_wready(sd_wready), .ram_rvalid(sd_rvalid),
+    .ram_rdata(sd_rdata));
+  sdram64 #(.CLK_HZ(CLK_HZ)) u_sdram (
+    .clk, .clk_sdram, .rst, .rd_mode(sdram_rd_mode_i), .ready(sd_ready),
+    .ram_req(sd_req), .ram_we(sd_we), .ram_line(sd_line), .ram_addr(sd_addr), .ram_be(sd_be),
+    .ram_wdata(sd_wdata), .ram_ack(sd_ack), .ram_wready(sd_wready), .ram_rvalid(sd_rvalid),
+    .ram_rbeat(sd_rbeat), .ram_rdata(sd_rdata),
+    .SDRAM_DQ(sdram_dq), .SDRAM_A(sdram_a), .SDRAM_BA(sdram_ba), .SDRAM_DQML(sdram_dqml),
+    .SDRAM_DQMH(sdram_dqmh), .SDRAM_nCS(sdram_ncs), .SDRAM_nRAS(sdram_nras), .SDRAM_nCAS(sdram_ncas),
+    .SDRAM_nWE(sdram_nwe), .SDRAM_CKE(sdram_cke));
 
   iob_req_t    iob_q [13];
   iob_rsp_t    iob_r [13];
@@ -614,7 +648,8 @@ module ss20_machine #(
   /* verilator lint_off UNUSEDSIGNAL */
   wire unused_inputs = ^{opt_l2tlb_i, uart_cts_i, uart_dsr_i,
                          leds, rtc_i[63:56], ld_state, kb_leds[1], arb_en,
-                         dbg_commit, dbg_trap, dbg_tt, dbg_pc, dbg_psr, dbg_w, hd_x};  // (CPU 0's only, with HANG_DUMP)
+                         dbg_commit, dbg_trap, dbg_tt, dbg_pc, dbg_psr, dbg_w, hd_x,  // (CPU 0's only, with HANG_DUMP)
+                         vr_bc, sd_rbeat, sd_ready};   // (the VRAM master's bursts are 1; lines are aligned)
   /* verilator lint_on UNUSEDSIGNAL */
 
 endmodule

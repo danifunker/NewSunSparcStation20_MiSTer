@@ -49,5 +49,5 @@ VFLAGS=(
 [ -n "${SIM_NCPU:-}" ] && VFLAGS+=(-GNCPU="$SIM_NCPU")
 
 cd "$ROOT"
-time verilator "${VFLAGS[@]}" "${SRCS[@]}" sim/sim_top.sv sim/sim_main.cpp
+time verilator "${VFLAGS[@]}" "${SRCS[@]}" sim/sdram_chip.sv sim/sim_top.sv sim/sim_main.cpp
 echo "built $OBJ/Vsim_top"
