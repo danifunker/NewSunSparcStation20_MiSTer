@@ -476,12 +476,22 @@ then boot.rom as index 0, so a boot.rom (the test scripts' ROM) wins.
 1. **Board check of the CPU area pass** (146a1de, rbf 08a60f05: 36,250
    ALMs, clk_sys +0.692 ns): cpu, netbsd, solaris, then the Sun PROM
    tests and the CD. docs/sessions/notes-area-20261019.md.
-2. **Phase 13 step 1: the TCX's VRAM and scan-out on SDRAM** (§3 phase
+   *Done 2026-10-19:* cpu 84/0/5, NetBSD under OpenBIOS, Solaris 8 on
+   both CPUs under the Sun OBP (loaded through the OSD). Not yet: the CD,
+   net, audio, NeXTSTEP, the POST.
+2. *Step 1 done 2026-10-19* (1124d48, 4be08f5; the board: Solaris's CDE
+   login and the Sun PROM's banner drawn right, cpu 84/0/5; partial
+   writes are read-merge-write: DQM is not reliable on the board).
+   Left: the build's HDMI seed (-0.083 ns on seed 3: sweep), the full
+   board matrix, and the VRAM's speed (a closed-page controller, a
+   read-merge-write per partial write: measure the console and X against
+   the DDR3 build; open pages / write bursts if it is slower).
+   **Phase 13 step 1: the TCX's VRAM and scan-out on SDRAM** (§3 phase
    13; the core requires the SDRAM module). The controller: the user's
    hp9000-715 `rtl/mister/sdram64.sv` (GPL-2+, board-proven) or
    Sorgelig's `sdram.sv` (GPL-3, allowed since 2026-10-18). A pin-level
    SDRAM model in the simulation. Measure what the CPUs gain on DDR3.
-3. **D-cache: the issues the 2026-10-18 review found.** (a) S_WRITE_WAIT
+3. *Done 2026-10-19 (e5b0e09, tb_l1cache).* **D-cache: the issues the 2026-10-18 review found.** (a) S_WRITE_WAIT
    re-checks for a hit every cycle against tags read at the current
    `idx_i`: if the index moves while a store waits (after a watchdog
    reset of the IU, for one) a store could update the wrong line; check

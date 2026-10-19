@@ -26,6 +26,9 @@ skip). Where the work stands, and what is next:
 [docs/sessions/HANDOFF-20261009.md](docs/sessions/HANDOFF-20261009.md)
 ("Current state" at the top); the phases: [docs/VERILOG-PLAN.md](docs/VERILOG-PLAN.md) §9.
 
+**The core requires the MiSTer SDRAM module** (since 2026-10-19: the TCX's
+frame buffer is on it).
+
 ## The OSD
 
 The menu follows the computer cores' OSD standard (hp9000-715_MiSTer

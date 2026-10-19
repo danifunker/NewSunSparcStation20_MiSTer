@@ -124,3 +124,24 @@ the VA, w_result into reg_rdata_o; l1cache the valid bits in their own
 byte lanes, the store-to-load forward that cannot happen (with an
 assertion first). Also seen: a possible false store hit in S_WRITE_WAIT
 if idx_i moves (low confidence, not examined yet).
+
+## After: VRAM on SDRAM and the D-cache fixes (2026-10-19)
+
+- e5b0e09 (D-cache: a waiting store checks its hit once; the dead store
+  forward goes; tb_l1cache reproduces the bug on the old cache).
+- 1124d48 (the TCX's VRAM and scan-out on SDRAM; two DDR3 arbiters gone):
+  fit seed 3: 35,824 ALMs (85 %), clk_sys +0.902 ns, HDMI +0.509, hold
+  +0.194 (rbf bfb12994). Board: Solaris's CDE login with every glyph
+  smeared, fills right: DQM byte masks ignored on the board.
+- 4be08f5 (partial VRAM writes read, merge and write whole; the chip
+  model's IGNORE_DQM shows the old adapter failing): fit seed 3: 36,107
+  ALMs (86 %), clk_sys +0.715 ns, **HDMI -0.083 ns** (the scaler's
+  seed-sensitive path: sweep), hold +0.190 (rbf a6343955). Board,
+  loaded through the OSD: OpenBIOS booting Solaris 8 to the CDE login,
+  drawn right; psrinfo both CPUs; `hwtest cpu` 84/0/5 (now loading
+  through scripts/board/osd_load.sh); the Sun OBP 2.25's banner and
+  scrolling text right. rd_mode 0 (clk edge 3) reads correctly at 55 MHz.
+- perfbench in the simulation (one CPU, the scan-out running): CHASE
+  133,006 -> 123,409 ticks (-7.2 %) with the scan-out off DDR3; the rest
+  within a few ticks.
+
