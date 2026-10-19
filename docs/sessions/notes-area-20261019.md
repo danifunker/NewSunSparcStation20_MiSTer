@@ -89,6 +89,15 @@ After 1-6: 10,979 / 4,844 (-1,093 ALUTs, -827 registers a CPU).
 Tried and not kept: one adder in srmmu's level_addr (no change: Quartus
 had shared them); the diagnostic read's way clamp in l1cache (+14).
 
+## The fit (146a1de, seed 3)
+
+36,250 ALMs (86 %), down from 37,197 (89 %, 81985c6 seed 3): -947 ALMs.
+Every clock met: clk_sys (the CPUs) +0.692 ns (was +0.257), HDMI +0.320
+(was +0.401), h2f_user0 +1.161, worst hold +0.201. 37,800 registers, 340
+RAM blocks, 41 DSPs. rbf md5 08a60f05. The CPU clock's gain fits the
+D-cache read mux change (its tightest path was the hit data into iu
+m_rdata). Not yet on the board.
+
 ## Left on the list
 
 From the reviews, not yet done: IU f_npc as "pc + 4" plus a flag,
