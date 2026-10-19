@@ -6,7 +6,6 @@
  *
  *   ss5-qemu  qemu-system-sparc -M SS-5    PROM at pa 0x0_70000000 (as on a
  *                                          real SPARCstation 5)
- *   ss5-core  this core's SS5 build        PROM at pa 0x0_F0000000
  *   ss20      qemu -M SS-20 and the core   PROM at pa 0xF_F0000000, run in
  *                                          boot mode from VA 0
  *
@@ -24,11 +23,6 @@
 #  define IO_ASI        0x20            /* MMU bypass, pa[35:32] = 0 */
 #  define ESCC_BASE     0x71100000
 #  define SHADOW_ROM    0
-#elif defined(TARGET_SS5_CORE)
-#  define ROM_BASE      0xf0000000
-#  define IO_ASI        0x20
-#  define ESCC_BASE     0x71100000
-#  define SHADOW_ROM    0
 #elif defined(TARGET_SS20)
 #  define ROM_BASE      0x00000000
 #  define IO_ASI        0x2f            /* MMU bypass, pa[35:32] = 0xf */
@@ -36,7 +30,7 @@
 #  define SHADOW_ROM    1
 #  define ROM_PA_LOW    0xf0000000      /* pa 0xf_f0000000 via ASI 0x2f */
 #else
-#  error "define TARGET_SS5_QEMU, TARGET_SS5_CORE or TARGET_SS20"
+#  error "define TARGET_SS5_QEMU or TARGET_SS20"
 #endif
 
 /* ESCC (Z85C30) on sun4m: channel B control/data at +0/+2, channel A

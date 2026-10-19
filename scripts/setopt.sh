@@ -19,7 +19,7 @@
 # Not in the OSD, meaning kept (the core ignores them for now):
 #   video=tcx|cg3            O[10]   no CG3 in this core: always TCX
 #   l2tlb=on|off             O[17]   no L2 TLB in this core yet
-#   iommu=26|11|23|30        O[21:20] SS5 only
+#   iommu=26|11|23|30        O[21:20] unused (the SS20's IOMMU is fixed)
 # Not in the OSD, bring-up only:
 #   sdram_rd=0|1|2|3         [33:32] sdram64's read capture point (0: clk
 #                            edge 3; 1: clk_sdram 2.75; 2: falling 2.5;

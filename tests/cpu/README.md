@@ -8,7 +8,6 @@ another. The same source runs in three places:
 | target | runs on | PROM link address |
 |---|---|---|
 | `ss5-qemu` | `qemu-system-sparc -M SS-5` | `0x70000000` (a real SPARCstation 5's) |
-| `ss5-core` | an SS5 build of the core, loaded through the OSD's **BIOS** entry (`F,ROM`) in place of `boot.rom` | `0xF0000000` (that build's PROM decode) |
 | `ss20` | `qemu-system-sparc -M SS-20`, and the core's SS20 build | `0` (boot mode); pa `0xF_F0000000` |
 
 The SS20 PROM is not readable at its link address with the MMU off, so
@@ -41,9 +40,9 @@ disassembles an image:
 python3 tools/romdis/sparcv8.py tests/cpu/out/ss5-qemu/cputest.rom 0x70000000 0 0x100
 ```
 
-On the core: copy `out/ss5-core/cputest.rom` (or `out/ss20/cputest.rom`)
-to the SD card, load it with the OSD **BIOS** entry, and read ttya from
-the MiSTer UART at 9600 baud. **Not yet tried on hardware.**
+On the core: `scripts/hwtest.sh 20 cpu` runs `out/ss20/cputest.rom` as
+`boot.rom` and compares ttya with `expected/ss20-core-hw.log`; by hand, load
+it with the OSD's **Load ROM** and read ttya from the MiSTer UART.
 
 ## Output
 

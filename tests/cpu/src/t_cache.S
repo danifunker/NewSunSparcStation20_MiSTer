@@ -8,7 +8,7 @@
  * SS20 PROM is not reachable through an identity map. */
 #include "macros.h"
 
-#if defined(TARGET_SS5_QEMU) || defined(TARGET_SS5_CORE)
+#if defined(TARGET_SS5_QEMU)
 
 #define PT_CTX   (SCRATCH + 0x0000)     /* context table, 256 entries */
 #define PT_L1    (SCRATCH + 0x1000)     /* level-1 table: 256 x 16 MB */

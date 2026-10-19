@@ -648,8 +648,6 @@ uart_init_seq:
 s_banner: .asciz "\nCPUTEST "
 #if defined(TARGET_SS5_QEMU)
 s_target: .asciz "ss5-qemu"
-#elif defined(TARGET_SS5_CORE)
-s_target: .asciz "ss5-core"
 #else
 s_target: .asciz "ss20"
 #endif

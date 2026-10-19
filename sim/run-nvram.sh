@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# run-nvram.sh 5|20 [--no-build] - the NVRAM image on the SD card
+# run-nvram.sh [20] [--no-build] - the NVRAM image on the SD card
 # (rtl/mister/nvram_sd.sv) in simulation: the CPU suite runs twice with an
 # image in slot 3 (sim_main --nvram), both runs in parallel.
 #
@@ -17,14 +17,13 @@
 set -uo pipefail
 REV="${1:-20}"
 case "$REV" in
-    5)  ROM=tests/cpu/out/ss5-core/cputest.rom; TYPE=0x80 ;;
     20) ROM=tests/cpu/out/ss20/cputest.rom;     TYPE=0x72 ;;
-    *)  echo "usage: $0 5|20 [--no-build]" >&2; exit 2 ;;
+    *)  echo "usage: $0 [20] [--no-build]" >&2; exit 2 ;;
 esac
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 [ "${2:-}" = "--no-build" ] || sim/build.sh "$REV" > /dev/null || exit 1
-python3 tests/cpu/build.py "$([ "$REV" = 5 ] && echo ss5-core || echo ss20)" > /dev/null || exit 1
+python3 tests/cpu/build.py ss20 > /dev/null || exit 1
 mkdir -p sim/out
 O=sim/out/nvram-ss$REV
 python3 - "$O" "$TYPE" <<'PY'

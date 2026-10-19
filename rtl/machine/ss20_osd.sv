@@ -27,7 +27,7 @@
 //
 // Not offered, meaning kept: [10] graphics 0 TCX / 1 CG3 (no CG3 in this
 // core: forced to TCX), [17] L2 TLB 0 On / 1 Off (no L2 TLB yet), [21:20]
-// IOMMU rev (SS5 only).
+// IOMMU rev (unused: the SS20's is fixed).
 // Retired, never to be reused for something else (old .CFG files may still
 // have them set): [1], [4], [5], [11], [15:14] (the old Scale, Normal
 // first), [16], [18], [19].

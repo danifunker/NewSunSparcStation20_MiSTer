@@ -5,7 +5,7 @@
  * implemented bits. SS5 targets only. */
 #include "macros.h"
 
-#if defined(TARGET_SS5_QEMU) || defined(TARGET_SS5_CORE)
+#if defined(TARGET_SS5_QEMU)
 
 /* mmu_walk(va %o0, mask %o1, orbits %o2, code base %o3): check_eq for
  * every pattern; code = base + pattern index. The context table pointer

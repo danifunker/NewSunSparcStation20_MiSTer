@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# run-cputest.sh 5|20 - the CPU test suite on the simulated machine, checked
+# run-cputest.sh [20] - the CPU test suite on the simulated machine, checked
 # against the hardware baseline.
 #
 # The simulation must print exactly what the board printed
@@ -8,20 +8,19 @@
 # check values. A difference is either an RTL change (update the baseline
 # from the board, not from here) or a simulation fault.
 #
-#   sim/run-cputest.sh 5 [--no-build]
+#   sim/run-cputest.sh 20 [--no-build]
 
 set -uo pipefail
 
-REV="${1:-5}"
+REV="${1:-20}"
 case "$REV" in
-    5)  ROM=tests/cpu/out/ss5-core/cputest.rom; EXP=tests/cpu/expected/ss5-core-hw.log ;;
     20) ROM=tests/cpu/out/ss20/cputest.rom;     EXP=tests/cpu/expected/ss20-core-hw.log ;;
-    *)  echo "usage: $0 5|20 [--no-build]" >&2; exit 2 ;;
+    *)  echo "usage: $0 [20] [--no-build]" >&2; exit 2 ;;
 esac
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 [ "${2:-}" = "--no-build" ] || sim/build.sh "$REV" > /dev/null || exit 1
-[ -f "$ROM" ] || python3 tests/cpu/build.py "$([ "$REV" = 5 ] && echo ss5-core || echo ss20)" > /dev/null
+[ -f "$ROM" ] || python3 tests/cpu/build.py ss20 > /dev/null
 
 mkdir -p sim/out
 LOG="sim/out/cputest-ss$REV.log"

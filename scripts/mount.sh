@@ -18,7 +18,7 @@
 # the absolute path NUL-padded (Main menu.cpp FileSaveConfig). The core
 # remounts them at every start, so this writes the records and nothing else.
 #
-# --mgl REV (5|20) (disabled: launching goes through the OSD only) wrote a one-shot MGL (for builds without the
+# --mgl REV (20) (disabled: launching goes through the OSD only) wrote a one-shot MGL (for builds without the
 # SC slots, or with --prom) and launches the core with it through
 # /dev/MiSTer_cmd. The rows an MGL names must be on the OSD's top page:
 # slots 0-2 and Load ROM are; slot 3 (NVRAM image, P5) is not.

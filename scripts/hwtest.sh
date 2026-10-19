@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# hwtest.sh 5|20 TEST... - regression runs on the MiSTer, logged and checked.
+# hwtest.sh 20 TEST... - regression runs on the MiSTer, logged and checked.
 #
 # Tests (run in the order given):
 #   cpu      the CPU suite as boot.rom (tests/cpu/out/<target>/cputest.rom);
@@ -7,8 +7,7 @@
 #            (--record overwrites that baseline instead)
 #   netbsd   OpenBIOS, console on ttya, HD0 = netbsd11.raw: wait for
 #            'login:', log in as root, run a command, check its output
-#   solaris  OpenBIOS, console on ttya, HD0 = sol8.img on the SS5,
-#            sol8-ss20.img on the SS20 (its /dev links name the SS20's ESP
+#   solaris  OpenBIOS, console on ttya, HD0 = sol8-ss20.img (its /dev links name the SS20's ESP
 #            path, docs/disk-images.md; target 3): wait for
 #            'console login:', log in as root, run a command, check its output
 #   solaris-obp  the Sun PROM (--obp FILE, here; Sun's image is never in the
@@ -129,11 +128,8 @@ while [ $# -gt 0 ]; do
         *) echo "unknown argument $a" >&2; exit 2 ;;
     esac
 done
-[ ${#TESTS[@]} -gt 0 ] || { echo "usage: $0 5|20 [--record] [--bios FILE] [--obp FILE] [--nvram NAME] [--minutes N] TEST... (see the header)" >&2; exit 2; }
-case "$REV" in
-    SunSparcStation5)  T=ss5-core; EXP=tests/cpu/expected/ss5-core-hw.log; OSIMG=sol8.img ;;
-    SunSparcStation20) T=ss20;     EXP=tests/cpu/expected/ss20-core-hw.log; OSIMG=sol8-ss20.img ;;
-esac
+[ ${#TESTS[@]} -gt 0 ] || { echo "usage: $0 20 [--record] [--bios FILE] [--obp FILE] [--nvram NAME] [--minutes N] TEST... (see the header)" >&2; exit 2; }
+T=ss20; EXP=tests/cpu/expected/ss20-core-hw.log; OSIMG=sol8-ss20.img
 G="/media/fat/games/$GAMES_DIR"
 mkdir -p sim/out
 rsh() { ssh "${SSH_OPTS[@]}" "$DEV" "$@"; }
@@ -171,7 +167,6 @@ stop_capture() {   # the local ssh, and the remote cat it started
 # Type on ttya; printf turns \r into Enter. No single quotes in $1.
 type_tty() { rsh "printf '$1' > /dev/ttyS1"; }
 
-scripts/machine.sh "$REV" > /dev/null || exit 1
 FAILED=0
 for t in "${TESTS[@]}"; do
     log="sim/out/hw-${REV#SunSparcStation}-$t.log"

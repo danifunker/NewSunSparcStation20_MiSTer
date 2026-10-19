@@ -7,7 +7,7 @@
     the suite (src/main.S, cputest.rom); e.g. --main=memstress
     e.g. -DDETAIL_LIMIT=1000 prints every failing check
 
-Targets: ss5-qemu (link 0x70000000), ss5-core (0xf0000000), ss20 (0).
+Targets: ss5-qemu (link 0x70000000; QEMU's SS-5), ss20 (0).
 Output: tests/cpu/out/<target>/cputest.rom (+ .map, .lst). Toolchain:
 LLVM's clang (--target=sparc, integrated assembler) and
 tools/sparc_link.py; tools/romdis/sparcv8.py disassembles the result.
@@ -22,7 +22,6 @@ REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
 LLVM = "/usr/lib/llvm-18/bin"
 TARGETS = {
     "ss5-qemu": ("TARGET_SS5_QEMU", 0x70000000, 0x40000),
-    "ss5-core": ("TARGET_SS5_CORE", 0xf0000000, 0x40000),
     "ss20": ("TARGET_SS20", 0x00000000, 0x40000),
 }
 

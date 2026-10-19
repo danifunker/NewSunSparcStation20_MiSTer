@@ -1,7 +1,7 @@
 /* Chipset registers after a power-on reset, and the address decode of the
  * PROM, the NVRAM IDPROM and the frame buffer's FCode. Not CPU tests: they
- * check the core's chipset fixes (docs/impl-gaps/chipset.md, AUX-1, DMA-2,
- * INT-1, TOD-5; design/sun-obp-boot.md M1, M5) with the suite's plumbing.
+ * check the core's chipset behaviour (AUX-1, DMA-2, INT-1, TOD-5) with the
+ * suite's plumbing.
  * Physical addresses through the MMU bypass ASIs: 0x20 for pa[35:32] = 0,
  * 0x2e/0x2f for 0xe/0xf. */
 #include "macros.h"
@@ -128,7 +128,7 @@ BEGIN(t_ebase, "chipset: DMA2 E_BASE_ADDR resets to 0xff")
         EXPECT(%l1, 0xff, 1)
 END
 
-#if defined(TARGET_SS5_QEMU) || defined(TARGET_SS5_CORE)
+#if defined(TARGET_SS5_QEMU)
 BEGIN(t_prom70, "chipset: the PROM answers at pa 0x7000_0000")
         set 0x70000000, %l0             /* pa of the SS5 boot PROM */
         lda [%l0] 0x20, %l1

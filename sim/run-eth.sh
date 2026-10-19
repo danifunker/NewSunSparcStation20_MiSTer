@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# run-eth.sh [5|20] [--no-build] - the Ethernet path in simulation: the
+# run-eth.sh [20] [--no-build] - the Ethernet path in simulation: the
 # ethtest ROM (tests/cpu/src/ethtest.S) with --eth-loop, where the
 # simulation plays Main's side of the frame mailbox (rtl/mister/eth_hps.sv)
 # and sends every transmitted frame back. Prints the test lines and the
@@ -8,9 +8,8 @@
 set -uo pipefail
 REV="${1:-20}"
 case "$REV" in
-    5)  T=ss5-core ;;
     20) T=ss20 ;;
-    *)  echo "usage: $0 [5|20] [--no-build]" >&2; exit 2 ;;
+    *)  echo "usage: $0 [20] [--no-build]" >&2; exit 2 ;;
 esac
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"

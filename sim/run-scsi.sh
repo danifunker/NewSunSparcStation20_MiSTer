@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# run-scsi.sh [5|20] [--no-build] - the SCSI path in simulation: the
+# run-scsi.sh [20] [--no-build] - the SCSI path in simulation: the
 # scsitest ROM (tests/cpu/src/scsitest.S) against two disk images of known
 # content, run twice in parallel:
 #   one  HD0 only (OSD "SCSI disks: HD0")
@@ -16,9 +16,8 @@
 set -uo pipefail
 REV="${1:-20}"
 case "$REV" in
-    5)  T=ss5-core ;;
     20) T=ss20 ;;
-    *)  echo "usage: $0 [5|20] [--no-build]" >&2; exit 2 ;;
+    *)  echo "usage: $0 [20] [--no-build]" >&2; exit 2 ;;
 esac
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"

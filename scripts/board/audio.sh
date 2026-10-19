@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # audio.sh solaris|netbsd|obp [--obp FILE] [--log FILE] - the SS20's audio
-# card (PLAN S1: the SS5's CS4231 + APC in SBus slot 3, with an FCode PROM of
+# card (a CS4231 + APC as on the SS5, in SBus slot 3, with an FCode PROM of
 # its own). Nobody listens here, so the checks are the ones software sees:
 #
 #   solaris  OpenBIOS, HD0 sol8-ss20.img: the CS4231 node is in the device

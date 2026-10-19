@@ -12,7 +12,7 @@
  *   pass 2  doubleword stores (std)         pass 4  byte stores (first 16 MB)
  * The CPU and DDR path alone (caches, smpmux, the DDR bridge and arbiter),
  * without an OS, MMU table changes or DMA. Written after Solaris and NetBSD
- * corrupted memory under disk I/O (docs/REWORK.md session 5). */
+ * corrupted memory under disk I/O. */
 #include "runtime.S"
 #include "mmu_setup.S"
 
