@@ -894,11 +894,13 @@ module cpu_module
 `ifndef SYNTHESIS
   // synthesis translate_off
   // The IU withdrew its data request while the data side was working on it
-  // (a trap flushed M): the answer would land on the next request
+  // (a trap flushed M): the answer would land on the next request. A reset
+  // or a watchdog reset abandons the access on purpose (D_WD answers
+  // nothing).
   logic dmr_valid_q;
   always_ff @(posedge clk) begin
     dmr_valid_q <= dmr.valid;
-    if (dmr_valid_q && !dmr.valid && ds != D_IDLE && !dms_q.ack)
+    if (dmr_valid_q && !dmr.valid && ds != D_IDLE && ds != D_WD && !rst && !wd_now && !dms_q.ack)
       $error("cpu_module: data request withdrawn mid-access (ds=%0d va=%08x): its answer would land on the next request", ds, dmr.va);
   end
   // synthesis translate_on
