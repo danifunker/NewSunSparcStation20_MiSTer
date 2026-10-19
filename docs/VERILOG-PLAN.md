@@ -492,9 +492,28 @@ then boot.rom as index 0, so a boot.rom (the test scripts' ROM) wins.
 4. **Instruction fetch** (profile-20261014.md: fetch was 12-28 % of
    cycles under NetBSD): the I-cache miss latency, forward-branch
    mispredicts, the bubble after a redirect. perfbench and the NetBSD
-   profile before and after.
+   profile before and after. Also the Sun PROM's CPU clock estimate
+   (user, 2026-10-19: psrinfo says 40 MHz under OBP 2.25, 27 MHz before
+   the speed work; OpenBIOS takes 55 from the TACUS word): the PROM times
+   a delay loop against the counter/timer and assumes a SuperSPARC's
+   cycles per iteration. Find the loop in the simulation (+pcsample under
+   OBP), count our cycles per iteration and remove what costs more than
+   the chip's (a taken backward branch, the fetch bubble): the goal is
+   ~55 MHz from the real speed, not from a changed timer.
 5. **An L2 cache** between ss20_mbus and ss20_memctl (~128 KB of the free
    M10K, ~2k ALMs): fork/exec, file and shell tests.
-6. As room is needed: the area list left in notes-area-20261019.md (the
+6. **The Sun PROM's start-up memory test** (user, 2026-10-19: it runs at
+   every start and takes minutes). Seen on the board: with no NVRAM
+   image mounted (slot 3, P5) the PROM finds a blank NVRAM ("Incorrect
+   configuration checksum"), sets its defaults and diag-switch? true, so
+   it tests all 464 MB (~1 MB/s) and then boots the diagnostic device
+   (the network), not the disk. (a) Give the core a valid default NVRAM
+   (diag-switch? false, auto-boot? true, boot-device disk; the IDPROM from
+   Main's seed as now) when no image is mounted, and make the image's
+   use clear in the README. (b) Measure the test's speed in the
+   simulation: the boot-mode PROM pace (ss20_memctl PROM_WAIT, kept for
+   the POST's counter/timer test), the caches being off in boot mode; make
+   it faster where the POST still passes. Compare with a real SS20's time.
+7. As room is needed: the area list left in notes-area-20261019.md (the
    FPU's aligner/normaliser shifter shared, the cache valid bits in
    their own byte lanes, IU f_npc and the delay-slot search, ...).

@@ -96,7 +96,22 @@ Every clock met: clk_sys (the CPUs) +0.692 ns (was +0.257), HDMI +0.320
 (was +0.401), h2f_user0 +1.161, worst hold +0.201. 37,800 registers, 340
 RAM blocks, 41 DSPs. rbf md5 08a60f05. The CPU clock's gain fits the
 D-cache read mux change (its tightest path was the hit data into iu
-m_rdata). Not yet on the board.
+m_rdata).
+
+Board (2026-10-19, the MiSTerPi at 192.168.99.143, rbf 08a60f05):
+- the CPU suite: CPUTEST DONE pass=84 fail=0 skip=5, the output equal to
+  ss20-core-hw.log (hwtest cpu; the core was loaded through
+  /dev/MiSTer_cmd then, which the user has since ruled out: loads go
+  through the OSD from here on);
+- NetBSD 11 GENERIC under OpenBIOS (boot.rom 72d937ea): root shell,
+  uname, a clean `shutdown -h`;
+- the core loaded through the OSD (F12, System, Core), HD0 mounted and
+  Load ROM = SunOBP.rom through the OSD: the official Sun OBP 2.25 with
+  both CPUs ("SPARCstation 20 MP (2 X 390Z50)", 464 MB); with no NVRAM
+  image it set its defaults and diag-switch? true, tested all 464 MB and
+  tried the network; Stop-A, `boot disk`: Solaris 8 to the CDE login,
+  then a command-line login: psrinfo shows both CPUs on-line; `init 0`
+  back to ok, clean.
 
 ## Left on the list
 
