@@ -165,21 +165,25 @@ module srmmu
   end
 
   // The CAM slices: slice s compares key bits [35-4s -: 4] of {VA[31:12],
-  // CTX}: 0-4 the VA, 5-8 the context
-  // A rewrite changes one entry's bit in a row: the byte holding it is
-  // written (byte enables), so only that byte is merged, not the 64 bits.
+  // CTX}: 0-4 the VA, 5-8 the context. A slice is 16 rows (the 4-bit key
+  // value) of 64 entry bits, in two RAMs of 32 (entries 0-31, 32-63)
+  // written a bit at a time (ram_sdp_bit): a rewrite changes one entry's
+  // bit in each row without reading the row. The read port is always the
+  // lookup's (lookups are spoiled while the engine runs).
   logic [3:0]  cam_raddr [9];
   logic [63:0] cam_rd [9];
-  logic [7:0]  cam_wb [9];               // the byte e_idx[5:3] of the row, rewritten
-  logic [7:0]  cam_be;
+  logic        cam_bit [9];              // the entry's bit in row cam_row of slice s
   logic        cam_we;
-  logic [3:0]  cam_waddr;
+  logic [3:0]  cam_row;
   genvar gs;
   generate
     for (gs = 0; gs < 9; gs++) begin : g_cam
-      ram_sdp_be #(.AW(4)) u_cam (
-        .clk, .waddr(cam_waddr), .we(cam_we), .be(cam_be), .wdata({8{cam_wb[gs]}}),
-        .raddr(cam_raddr[gs]), .rdata(cam_rd[gs]));
+      ram_sdp_bit #(.AW(4)) u_lo (
+        .clk, .waddr({cam_row, e_idx[4:0]}), .we(cam_we && !e_idx[5]), .wbit(cam_bit[gs]),
+        .raddr(cam_raddr[gs]), .rdata(cam_rd[gs][31:0]));
+      ram_sdp_bit #(.AW(4)) u_hi (
+        .clk, .waddr({cam_row, e_idx[4:0]}), .we(cam_we && e_idx[5]), .wbit(cam_bit[gs]),
+        .raddr(cam_raddr[gs]), .rdata(cam_rd[gs][63:32]));
     end
   endgenerate
 
@@ -240,15 +244,20 @@ module srmmu
                                        input logic en, input logic boot);
     xlat_rsp_t a;
     a = '0;
+    // pa, pte_c, acc and m are meaningful only with hit (cpu_module reads
+    // them with hit alone), so they are formed whatever the flags say: no
+    // gating muxes on the address path
+    if (r.at[1] && boot) a.pa = {8'hFF, r.va[27:0]};   // boot mode: fetches go to the PROM
+    else if (!en)        a.pa = {4'h0, r.va};
+    else                 a.pa = pte_pa(e, r.va);
+    a.pte_c = e.c; a.acc = e.acc; a.m = e.m;
     if (!r.valid) return a;
-    if (r.at[1] && boot) begin               // boot mode: fetches go to the PROM
-      a.hit = 1'b1; a.pa = {8'hFF, r.va[27:0]};
-    end else if (!en) begin
-      a.hit = 1'b1; a.pa = {4'h0, r.va};
+    if ((r.at[1] && boot) || !en) begin
+      a.hit = 1'b1;
     end else if (hit) begin
       if (acc_fault(r.at, e.acc) != FT_NONE) a.fault = 1'b1;
       else if (r.at[2] && !e.m) a.miss = 1'b1;   // a store to a page with M = 0: walk again
-      else begin a.hit = 1'b1; a.pa = pte_pa(e, r.va); a.pte_c = e.c; a.acc = e.acc; a.m = e.m; end
+      else a.hit = 1'b1;
     end else begin
       a.miss = 1'b1;
     end
@@ -268,17 +277,13 @@ module srmmu
   logic [1:0]  e_lvl;
   logic        e_glob;         // ACC 6-7: any context
 
-  // The CAM row write of the rewrite: bit e_idx of row ecnt-1 of each slice
-  logic [3:0]  cam_row;
+  // The CAM row write of the rewrite: bit e_idx of row ecnt-1 of each
+  // slice (rows 0-15 in E_CAM's cycles 1-16, as when a row was read first)
   assign cam_row   = 4'(ecnt - 7'd1);
   assign cam_we    = es == E_CAM && ecnt != 7'd0;
-  assign cam_waddr = cam_row;
-  assign cam_be    = 8'd1 << e_idx[5:3];
   always_comb
-    for (int s = 0; s < 9; s++) begin
-      cam_wb[s] = cam_rd[s][8 * e_idx[5:3] +: 8];
-      cam_wb[s][e_idx[2:0]] = ((cam_row ^ e_key[35 - 4 * s -: 4]) & slice_care(s, e_lvl, e_glob)) == 4'h0;
-    end
+    for (int s = 0; s < 9; s++)
+      cam_bit[s] = ((cam_row ^ e_key[35 - 4 * s -: 4]) & slice_care(s, e_lvl, e_glob)) == 4'h0;
 
   // ---------------------------------------------------------------------
   // The lookup
@@ -300,7 +305,7 @@ module srmmu
   assign lk_a   = xd_sel_i ? xd_i : xi_i;
   assign lk_key = {lk_a.va[31:12], ctx};
   always_comb
-    for (int s = 0; s < 9; s++) cam_raddr[s] = es == E_CAM ? ecnt[3:0] : lk_key[35 - 4 * s -: 4];
+    for (int s = 0; s < 9; s++) cam_raddr[s] = lk_key[35 - 4 * s -: 4];
 
   logic [63:0] hv;
   logic        hb_hit, h_hit;
@@ -333,13 +338,17 @@ module srmmu
   always @(posedge clk) if (!rst && xd_i.valid && !xd_sel_i) $error("srmmu: a data-side lookup without xd_sel_i");
 `endif
   always_comb begin
-    xd_o = '0; xi_o = '0;
+    // the flags steered to the port served; the payload to both (it is
+    // read only with hit)
+    xd_o = h_ans; xi_o = h_ans;
+    {xd_o.hit, xd_o.miss, xd_o.fault, xd_o.busy} = '0;
+    {xi_o.hit, xi_o.miss, xi_o.fault, xi_o.busy} = '0;
     if (xd_i.valid) begin
-      if (lk_go && lk_d_q) xd_o = h_ans;
+      if (lk_go && lk_d_q) {xd_o.hit, xd_o.miss, xd_o.fault} = {h_ans.hit, h_ans.miss, h_ans.fault};
       else xd_o.busy = 1'b1;
     end
     if (xi_i.valid) begin
-      if (lk_go && !lk_d_q) xi_o = h_ans;
+      if (lk_go && !lk_d_q) {xi_o.hit, xi_o.miss, xi_o.fault} = {h_ans.hit, h_ans.miss, h_ans.fault};
       else xi_o.busy = 1'b1;
     end
   end

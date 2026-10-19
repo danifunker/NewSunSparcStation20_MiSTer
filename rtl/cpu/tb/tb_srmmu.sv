@@ -128,7 +128,11 @@ module tb_srmmu;
       u_new.xlat(iport, va, at, a_n, wk_n, wf_n);
       u_ref.xlat(iport, va, at, a_r, wk_r, wf_r);
     join
-    check(a_n == a_r && wk_n == wk_r && wf_n == wf_r,
+    // the flags always; pa, acc, m, pte_c only with hit (the design forms
+    // them whatever the flags say: cpu_module reads them with hit alone)
+    check({a_n.hit, a_n.miss, a_n.fault, a_n.busy} == {a_r.hit, a_r.miss, a_r.fault, a_r.busy} &&
+          (!a_r.hit || {a_n.pa, a_n.pte_c, a_n.acc, a_n.m} == {a_r.pa, a_r.pte_c, a_r.acc, a_r.m}) &&
+          wk_n == wk_r && wf_n == wf_r,
           $sformatf("xlat %s va=%08x at=%0d: hit %0d fault %0d pa %09x acc %0d m %0d c %0d walked %0d wfault %0d; reference %0d %0d %09x %0d %0d %0d %0d %0d",
                     iport ? "I" : "D", va, at, a_n.hit, a_n.fault, a_n.pa, a_n.acc, a_n.m, a_n.pte_c, wk_n, wf_n,
                     a_r.hit, a_r.fault, a_r.pa, a_r.acc, a_r.m, a_r.pte_c, wk_r, wf_r));
