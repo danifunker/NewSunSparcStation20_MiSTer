@@ -5,34 +5,88 @@ scratch in SystemVerilog: SuperSPARC-compatible CPUs, the sun4m chipset,
 SCSI disks and CD-ROM, Ethernet, the TCX frame buffer, Sun keyboard and
 mouse, and CS4231 audio. Licensed GPL-2.0-or-later.
 
-## Status (2026-10-19)
+**Requires the MiSTer SDRAM module.**
 
-The core runs with **two SuperSPARC CPU modules at 55 MHz** (about 86 %
-of the FPGA, every clock met). It boots under two PROMs:
+> **Please test the video.** The frame buffer has just moved from the
+> DDR3 to the SDRAM module. Report anything wrong on screen: garbage,
+> wrong colours, a black screen, slow drawing. Say which PROM and OS
+> you used (console text, CDE/X, NeXTSTEP) and which SDRAM module you
+> have.
 
-- **OpenBIOS** (built from `bios/`; a matching `boot.rom` is in
-  [releases/](releases/README.md)): NetBSD 11 and Solaris 8 from disk,
-  NetBSD's install CD, CD audio, and the network.
-- **Sun's OBP 2.25** (from a real SS20; not distributed here): its
-  diagnostic POST on both CPUs with no errors, and Solaris 8 with both
-  CPUs on-line.
+## Features
 
-The bare-metal CPU and chipset test suite (`tests/cpu`) passes on the
-board (84 pass, 0 fail, 5 skip). What is next:
-[docs/VERILOG-PLAN.md](docs/VERILOG-PLAN.md) §9 and §10.
+- Two SuperSPARC (TMS390Z50) CPU modules at 55 MHz, SMP: integer unit,
+  IEEE single/double FPU, SRMMU, 20 KB I-cache and 16 KB D-cache with
+  bus snooping.
+- 64, 128, 256 or 464 MB of memory.
+- Boots OpenBIOS (a matching `boot.rom` is in `releases/`) or Sun's own
+  OBP 2.25 (not included), as `boot.rom` or through Load ROM.
+- SCSI (ESP + DMA2): two hard disks and a CD-ROM, with CD audio.
+- Ethernet (LANCE) through the MiSTer's network.
+- TCX frame buffer: 1024x768, 8-bit, hardware cursor, blit and stipple
+  acceleration. Or the console on the serial port.
+- Sun Type 5 keyboard (layouts, Alt/Win swap) with bell and click; Sun
+  mouse.
+- CS4231 audio.
+- Serial port A on the MiSTer's UART.
+- NVRAM and clock (M48T08), saved to an image file; the IDPROM
+  (Ethernet address, hostid) from the MiSTer's ID. Without an image the
+  Sun PROM starts with its defaults and boots the disk, with no full POST.
+- OSD in the computer cores' layout.
 
-**The core requires the MiSTer SDRAM module**: the TCX's frame buffer is
-on it.
+## Tested
 
-## Getting started
+- NetBSD 11: disk, install CD, network, audio; the MP kernel on both
+  CPUs under the Sun PROM.
+- Solaris 8: disk, CDE, both CPUs, network, audio; under both PROMs.
+- NeXTSTEP 3.3: installs and runs the Workspace; under both PROMs.
+- Sun OBP 2.25: the POST on both CPUs, the network, audio and CD tests.
+- CD audio.
+- The CPU and chipset test suite (`tests/cpu`): 84 pass, 0 fail, 5 skip.
+- 30-minute stress runs under Solaris, both PROMs.
 
-1. Copy the rbf from [releases/](releases/README.md) to `_Unstable/` (or
-   `_Computer/`) on the SD card.
-2. Copy `releases/boot.rom` (OpenBIOS) to `games/SunSparcStation/boot.rom`,
-   or use Sun's own PROM there instead.
+## Limitations
+
+- At most 464 MB of memory.
+- CPUs at 55 MHz with no external cache (no SuperCache/MXCC).
+- One frame buffer: the TCX, 8-bit only (no 24-bit TCX, cgsix or SX).
+- No floppy drive, no parallel port device, no ISDN (DBRI) audio.
+- Sun's OBP is not included: supply your own SS20 PROM image.
+- The network and CD audio need a current Main_MiSTer (Sun support
+  merged 2026-10-06/07).
+
+## Known issues
+
+- The clock does not take the MiSTer's time.
+- Under OpenBIOS, white shows pale yellow; Solaris's text console after
+  X exits is white on white.
+- `psrinfo` reports 40 MHz under the Sun PROM (its own estimate).
+- Under OpenBIOS, NetBSD's MP kernel does not start the second CPU.
+- NeXTSTEP's GUI needs the console on the screen and keyboard.
+
+What is next: [docs/VERILOG-PLAN.md](docs/VERILOG-PLAN.md).
+
+## Install
+
+1. Copy the rbf from `releases/` (`SunSparcStation20_20261019.rbf`) to
+   the SD card's `_Unstable/` (or `_Computer/`).
+2. Copy `releases/boot.rom` (OpenBIOS) to
+   `games/SunSparcStation/boot.rom`, or use Sun's own PROM there instead.
+   The core needs this OpenBIOS (built from `bios/`): older ones list all
+   memory in one `/memory` entry, and Solaris 8 panics early.
 3. Put disk images in `games/SunSparcStation/` and mount them from the
-   OSD ([docs/disk-images.md](docs/disk-images.md) says how the test
-   images were made).
+   OSD: Pri. disk is SCSI target 3, CD-ROM target 6.
+   [docs/disk-images.md](docs/disk-images.md) says how to make them.
+4. Give the core its own video mode in `MiSTer.ini` (a 720p output
+   shrinks 1024x768 and drops pixel columns from Sun's fonts):
+
+   ```ini
+   [SunSparcStation]
+   video_mode=1        ; 1024x768@60: the picture 1:1
+   ```
+
+   (or, on a 1080p TV, `video_mode=8` with `vscale_mode=1`: integer
+   scaling, 1024x768 with borders).
 
 ## The OSD
 
@@ -114,7 +168,7 @@ every change back, so `setenv` sticks.
 | `docs/` | the plan ([VERILOG-PLAN.md](docs/VERILOG-PLAN.md)), the architecture (`arch/`), our analysis of the SS20 and SS5 PROMs (`rom-disassembly/`, no Sun code), benchmarks, the reference index | ours |
 | `bios/` | OpenBIOS and fcode-utils; `scripts/build-bios.sh` builds the boot ROM | GPL-2 |
 | `sys/` | the Template_MiSTer framework, unchanged | GPL-2+ |
-| `releases/` | test builds: the rbf and the OpenBIOS `boot.rom` it needs | GPL |
+| `releases/` | the release: the rbf and the OpenBIOS `boot.rom` it needs | GPL |
 
 Not here, on purpose: Sun PROM images and anything reproduced from them.
 
