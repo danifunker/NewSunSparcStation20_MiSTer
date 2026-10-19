@@ -5,11 +5,10 @@
 # simulated machine, its console on ttya, to the `ok` prompt.
 #
 # The NVRAM: OBP keeps its options in a Sun-format image with a checksum
-# (tools/obp_nvram.py). Without --nvram, sim/out/obp.nvr is made once: OBP
-# runs on a blank image (it writes its defaults: console on the keyboard
-# and screen), then tools/obp_nvram.py sets input-device and output-device
-# to ttya and auto-boot? to false. The run uses a copy (the simulation
-# writes the image back). --diag sets diag-switch? (the POST runs, its
+# (tools/obp_nvram.py). Without --nvram, sim/out/obp.nvr is made once by
+# tools/obp_nvram.py --new (OBP's defaults, the ones the core writes into
+# an empty NVRAM) with input-device and output-device ttya and auto-boot?
+# false. The run uses a copy (the simulation writes the image back). --diag sets diag-switch? (the POST runs, its
 # messages on ttya; ss20_memctl slows boot-mode PROM reads to the real
 # EPROM's pace, which its counter/timer test needs).
 #
@@ -41,13 +40,8 @@ OUT="$ROOT/sim/out"
 mkdir -p "$OUT"
 if [ -z "$NV" ]; then
     NV="$OUT/obp.nvr"
-    if [ ! -f "$NV" ]; then
-        echo "run-obp: making $NV (OBP's defaults from a blank image; ~10 min)"
-        dd if=/dev/zero of="$OUT/obp-blank.nvr" bs=8192 count=1 2>/dev/null
-        "$SIM" --rom "$ROM" --nvram "$OUT/obp-blank.nvr" --ram 64 --cycles 600M --quiet > /dev/null 2>&1 || true
-        python3 "$ROOT/tools/obp_nvram.py" "$OUT/obp-blank.nvr" "$NV" \
-            input-device=ttya output-device=ttya 'auto-boot?=false' > /dev/null
-    fi
+    [ -f "$NV" ] || python3 "$ROOT/tools/obp_nvram.py" --new "$NV" \
+        input-device=ttya output-device=ttya 'auto-boot?=false' > /dev/null
 fi
 RUN="$OUT/obp-run.nvr"
 if [ "$DIAG" = 1 ]; then

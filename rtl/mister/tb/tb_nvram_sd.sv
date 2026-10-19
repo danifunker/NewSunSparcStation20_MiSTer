@@ -14,11 +14,14 @@
 //    after the last write; clock-byte writes are not saved;
 //  - a blank image gets the built-in IDPROM (format 1, type 0x72,
 //    08:00:20 + the seed's serial, checksum 0), written back at once: the
-//    file is zeros but for that IDPROM; with no seed the serial is 123456;
+//    file is zeros but for that IDPROM and the Sun OBP's defaults
+//    (obp_nvram_pkg), sectors 0-3 and 15 written back, lowest first; with
+//    no seed the serial is 123456;
 //  - a valid IDPROM with zero bytes in it loads unchanged;
 //  - read-only images are loaded and never written;
 //  - no image: `ready` after TIMEOUT, the IDPROM stamped with the seed if
-//    one came, else the power-up one; no SD traffic;
+//    one came, else the power-up one, the OBP defaults written at power-up;
+//    no SD traffic;
 //  - a mount of another size, or an unmount, disconnects the image;
 //  - a load Main never serves is given up on at LOADMAX.
 // The file's clock bytes (0x1FF8-0x1FFF) are left out of the comparisons:
@@ -28,6 +31,7 @@
 /* verilator lint_off BLKSEQ */        // its hps_io model is behavioural, like sim_main.cpp's
 module tb_nvram_sd;
   import iobus_pkg::*;
+  import obp_nvram_pkg::*;
   import tb_pkg::*;
 
   localparam int TIMEOUT = 2_000, LOADMAX = 200_000, QUIET = 20_000;   // nvram_sd's SIMU timers
@@ -251,6 +255,32 @@ module tb_nvram_sd;
     check(x == 8'h00, $sformatf("%s: the NVRAM's IDPROM checksum", what));
   endtask
 
+  // The Sun OBP's defaults over an image
+  function automatic void add_defaults(inout logic [7:0] img [8192]);
+    logic [27:0] e;
+    for (int k = 0; k < OBP_DFLT_N; k++) begin
+      e = obp_dflt(6'(k));
+      img[2 * e[27:16]]     = e[7:0];
+      img[2 * e[27:16] + 1] = e[15:8];
+    end
+  endfunction
+
+  // The OBP's configuration checksum (tools/obp_nvram.py) holds in the NVRAM
+  task automatic check_obp(input string what);
+    logic [7:0] x, b, ck;
+    x = 8'h38 ^ 8'hf0;
+    for (int a = 'h20; a < 'h1cd8; a++) begin
+      rd8(13'(a), b);
+      x ^= b;
+    end
+    rd8(13'h0, ck);
+    check(ck == x, $sformatf("%s: the OBP checksum (%02x, expected %02x)", what, ck, x));
+    rd8(13'h5a8, b);
+    check(b == 8'hff, $sformatf("%s: OBP auto-boot? true", what));
+    rd8(13'h001, b);
+    check(b == 8'h00, $sformatf("%s: OBP diag-switch? false", what));
+  endtask
+
   function automatic bit log_is(input int unsigned exp [$]);
     if (lba_log.size() != exp.size()) return 0;
     foreach (exp[i]) if (lba_log[i] != exp[i]) return 0;
@@ -346,13 +376,17 @@ module tb_nvram_sd;
     check(ready, "blank: ready after the load");
     check_idprom(24'h61_56_F1, "blank+seed");
     settle(200);
-    check(n_reads == 16 && n_writes == 1 && lba_log[16] == 115,
-          $sformatf("blank+seed: the IDPROM sector written back at once, got%s", log_str()));
+    check(n_reads == 16 && n_writes == 5 && log_is('{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13,
+          14, 15, 100, 101, 102, 103, 115}),
+          $sformatf("blank+seed: the defaults' and the IDPROM's sectors written back at once, got%s",
+                    log_str()));
     builtin(24'h61_56_F1, id);
     for (int i = 0; i < 8192; i++) exp[i] = 8'h00;
     for (int i = 0; i < 16; i++) exp['h1FD8 + i] = id[i];
-    compare_file(exp, "blank+seed: zeros but for the IDPROM");
+    add_defaults(exp);
+    compare_file(exp, "blank+seed: zeros but for the IDPROM and the OBP defaults");
     compare_nvram(exp, "blank+seed: the NVRAM");
+    check_obp("blank+seed");
 
     // ================= a blank image, no seed: serial 12:34:56
     for (int i = 0; i < 8192; i++) file[i] = 8'h00;
@@ -363,11 +397,40 @@ module tb_nvram_sd;
     wait_ready(LOADMAX, at);
     settle(200);
     check_idprom(24'h12_34_56, "blank, no seed");
-    check(n_writes == 1, "blank, no seed: the IDPROM written back");
+    check(n_writes == 5, "blank, no seed: the IDPROM and the defaults written back");
     builtin(24'h12_34_56, id);
     for (int i = 0; i < 8192; i++) exp[i] = 8'h00;
     for (int i = 0; i < 16; i++) exp['h1FD8 + i] = id[i];
+    add_defaults(exp);
     compare_file(exp, "blank, no seed: the file");
+
+    // ================= an image with only a valid IDPROM is blank too
+    for (int i = 0; i < 8192; i++) file[i] = 8'h00;
+    builtin(24'h00_00_09, id);
+    for (int i = 0; i < 16; i++) file['h1FD8 + i] = id[i];
+    power_on();
+    cycles(50);
+    mount(64'd8192, 1'b0);
+    wait_ready(LOADMAX, at);
+    settle(200);
+    check(n_writes == 4 && log_is('{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+          100, 101, 102, 103}), $sformatf("IDPROM only: the defaults' sectors saved, got%s", log_str()));
+    check_idprom(24'h00_00_09, "IDPROM only");
+    check_obp("IDPROM only");
+
+    // ================= one nonzero byte below the IDPROM: not blank
+    for (int i = 0; i < 8192; i++) file[i] = 8'h00;
+    file['h1F4F] = 8'h01;
+    exp = file;
+    builtin(24'h12_34_56, id);
+    for (int i = 0; i < 16; i++) exp['h1FD8 + i] = id[i];
+    power_on();
+    cycles(50);
+    mount(64'd8192, 1'b0);
+    wait_ready(LOADMAX, at);
+    settle(200);
+    check(n_writes == 1 && lba_log[16] == 115, $sformatf("one byte: only the IDPROM saved, got%s", log_str()));
+    compare_file(exp, "one byte: no defaults");
 
     // ================= a valid IDPROM with zero serial bytes loads unchanged
     file = orig;
@@ -403,7 +466,8 @@ module tb_nvram_sd;
     wait_ready(LOADMAX, at);
     cycles(2 * QUIET + 500);
     check_idprom(24'h01_02_03, "blank, read-only");
-    check(n_writes == 0, "blank, read-only: the IDPROM not written back");
+    check_obp("blank, read-only");
+    check(n_writes == 0, "blank, read-only: the IDPROM and the defaults not written back");
 
     // ================= no image, a seed: stamped at TIMEOUT
     for (int a = 'h1FD8; a < 'h1FE8; a++) wr8(13'(a), 8'h77);   // junk first
@@ -429,6 +493,19 @@ module tb_nvram_sd;
     check(at - t0 >= TIMEOUT && at - t0 < TIMEOUT + 10,
           $sformatf("no image: ready %0d cycles after power-up", at - t0));
     check_idprom(24'h12_34_56, "no image, no seed");
+    begin : no_image_defaults
+      logic [27:0] e;
+      logic [7:0]  b0, b1;
+      int          bad;
+      bad = 0;
+      for (int k = 0; k < OBP_DFLT_N; k++) begin
+        e = obp_dflt(6'(k));
+        rd8(13'(2 * e[27:16]), b0);
+        rd8(13'(2 * e[27:16] + 1), b1);
+        if ({b1, b0} != e[15:0]) bad++;
+      end
+      check(bad == 0, $sformatf("no image: %0d OBP default halfwords missing", bad));
+    end
 
     // ================= a mount of another size disconnects
     file = orig;

@@ -9,6 +9,7 @@
 # takes the list from there, so the two cannot drift apart.
 # SIM_OBJ=dir builds elsewhere, e.g. while a run still uses the usual model.
 # SIM_NCPU=n builds the machine with n CPU modules (default 2, as the core).
+# SIM_JOBS=n compiles with n jobs (default 0: all cores; use 2 on a shared box).
 
 set -euo pipefail
 
@@ -36,7 +37,7 @@ while read -r f; do SRCS+=("$f"); done \
 [ "${#SRCS[@]}" -gt 0 ] || { echo "no rtl/ sources in files.qip" >&2; exit 1; }
 
 VFLAGS=(
-    --cc --exe --build -j 0
+    --cc --exe --build -j "${SIM_JOBS:-0}"
     --top-module sim_top
     -O3 --x-assign fast --x-initial fast --noassert
     -Wno-fatal -Wno-lint -Wno-style

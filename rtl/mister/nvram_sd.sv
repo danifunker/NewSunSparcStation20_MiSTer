@@ -48,6 +48,18 @@
 //    stamped into the NVRAM before `ready`, so the machine's identity
 //    follows the MiSTer rather than the bitstream.
 //
+// The Sun PROM's defaults (rtl/pkg/obp_nvram_pkg.sv, from
+// tools/obp_nvram.py). Sun's OBP 2.25 checks its options with a checksum;
+// on an empty NVRAM it fails, and OBP then sets its defaults with
+// diag-switch? true: the full POST, a test of all of memory (minutes) and
+// a network boot at every start. So an empty NVRAM gets a valid OBP
+// configuration (the defaults, diag-switch? false, boot-device disk)
+// written into it, OBP_DFLT_N halfwords after the IDPROM at power-up, and
+// after the load of an image that is zero below the IDPROM (a new file),
+// whose sectors it touches are then written back at once. OpenBIOS keeps
+// its own format: it reads such an NVRAM as unformatted, formats it in RAM
+// and writes the chip only when a variable changes (bios/, nvram.c).
+//
 // The hps_io side (WIDE = 1): one 512-byte block per request (sd_blk_cnt
 // = 0), sd_lba = the sector 0-15. sd_rd/sd_wr are held until sd_ack rises;
 // the transfer is over when sd_ack falls. sd_buff_dout's halfword holds the
@@ -122,11 +134,14 @@ module nvram_sd
   output logic        ready          // the NVRAM holds the image, or none came
 );
 
+  import obp_nvram_pkg::*;   // (Quartus 17 takes one import in the header)
+
   localparam int TIMEOUT = SIMU ? 2_000   : CLK_HZ * 3;
   localparam int LOADMAX = SIMU ? 200_000 : CLK_HZ * 6;
   localparam int QUIET   = SIMU ? 20_000  : CLK_HZ / 2;
   localparam int PW = $clog2(LOADMAX + 1);
   localparam int QW = $clog2(QUIET + 1);
+  localparam int DW = $clog2(OBP_DFLT_N);
 
   // The IDPROM: sector 15, halfwords 0xEC-0xF3 (bytes 0x1FD8-0x1FE7)
   localparam logic [3:0] ID_SEC = 4'hF;
@@ -160,6 +175,12 @@ module nvram_sd
   logic            stamped      = 1'b0;
   logic [2:0]      st_k         = 3'd0;
   logic            a0_q         = 1'b0;
+  // The OBP defaults writer: at power-up (after the IDPROM writer), then
+  // after a blank image's load (df_ready: `ready` when it is done).
+  logic            df_run       = 1'b1;
+  logic            df_ready     = 1'b0;
+  logic [DW-1:0]   df_k         = '0;
+  logic            zero_img     = 1'b0;   // the image loaded so far is zero below the IDPROM
   /* verilator lint_on PROCASSINIT */
 
   // The lowest dirty sector
@@ -207,7 +228,7 @@ module nvram_sd
       if (seed_ok && !stamped) begin
         st_run  <= 1'b1;
         st_seed <= 1'b1;
-      end else if (!st_run) begin
+      end else if (!st_run && !df_run) begin
         ready_q <= 1'b1;
       end
     end
@@ -217,13 +238,24 @@ module nvram_sd
         st_run <= 1'b0;
         if (st_seed) stamped <= 1'b1;
       end
+    end else if (df_run) begin
+      if (ena) dirty[df_e[27:24]] <= 1'b1;
+      df_k <= df_k + 1'b1;
+      if (df_k == DW'(OBP_DFLT_N - 1)) begin
+        df_run   <= 1'b0;
+        df_k     <= '0;
+        df_ready <= 1'b0;
+        if (df_ready) ready_q <= 1'b1;
+      end
     end
 
     case (state)
-      S_IDLE: begin
+      // (no transfer while a writer has the image port)
+      S_IDLE: if (!st_run && !df_run) begin
         if (load_pending) begin
           load_pending <= 1'b0;
           loading      <= 1'b1;
+          zero_img     <= 1'b1;
           sec          <= 4'd0;
           rd_q         <= 1'b1;
           state        <= S_REQ;
@@ -252,7 +284,12 @@ module nvram_sd
           if (loading) begin
             if (sec == 4'hF) begin
               loading <= 1'b0;
-              ready_q <= 1'b1;
+              if (zero_img) begin                 // a new file: the OBP defaults first
+                df_run   <= 1'b1;
+                df_ready <= 1'b1;
+              end else begin
+                ready_q  <= 1'b1;
+              end
               if (idgen) dirty[ID_SEC] <= 1'b1;   // save the built-in IDPROM
             end else begin
               sec   <= sec + 1'b1;
@@ -268,6 +305,9 @@ module nvram_sd
 
     if (loading && sd_ack && sd_buff_wr && sec == ID_SEC && sd_buff_addr[7:0] == ID_HW)
       idgen <= sd_buff_dout[7:0] == 8'h00;
+    if (loading && sd_ack && sd_buff_wr && {sec, sd_buff_addr[7:0]} < {ID_SEC, ID_HW} &&
+        sd_buff_dout != 16'h0000)
+      zero_img <= 1'b0;
 
     // CPU writes (after the case: a mark wins over the clear above)
     if (cpu_chg && ena) begin
@@ -310,6 +350,10 @@ module nvram_sd
       st_seed      <= 1'b0;
       stamped      <= 1'b0;
       st_k         <= 3'd0;
+      df_run       <= 1'b1;
+      df_ready     <= 1'b0;
+      df_k         <= '0;
+      zero_img     <= 1'b0;
     end
   end
 
@@ -322,7 +366,8 @@ module nvram_sd
   // The sector buffer is the NVRAM itself. The halfword written, in Main's
   // order: the built-in IDPROM's (the writer, or a blank image's IDPROM
   // during the load: blank is decided at its first halfword, which holds
-  // the format byte), else the file's.
+  // the format byte), an OBP default's (its writer), else the file's.
+  logic [27:0] df_e;         // the OBP default entry df_k: {halfword address, halfword}
   logic [11:0] hw;           // the file halfword addressed
   logic [23:0] serial;
   logic        id_range, id_blank;
@@ -330,17 +375,20 @@ module nvram_sd
   logic [15:0] half;
 
   assign serial   = seed_ok ? seed : 24'h12_34_56;
-  assign hw       = st_run ? {ID_SEC, ID_HW + 8'(st_k)} : {sec, sd_buff_addr[7:0]};
+  assign df_e     = obp_dflt(df_k);
+  assign hw       = st_run ? {ID_SEC, ID_HW + 8'(st_k)} : df_run ? df_e[27:16] : {sec, sd_buff_addr[7:0]};
   assign id_range = hw >= {ID_SEC, ID_HW} && hw <= {ID_SEC, ID_HW + 8'd7};
   assign id_k     = 3'(hw[7:0] - ID_HW);
   assign id_blank = (hw[7:0] == ID_HW) ? sd_buff_dout[7:0] == 8'h00 : idgen;
 
   always_comb begin
-    if (st_run || (id_range && id_blank)) half = id_half(id_k, serial);
-    else                                  half = sd_buff_dout;
+    if (st_run)                     half = id_half(id_k, serial);
+    else if (df_run)                half = df_e[15:0];
+    else if (id_range && id_blank)  half = id_half(id_k, serial);
+    else                            half = sd_buff_dout;
   end
 
-  assign nv_we    = st_run | (loading & sd_ack & sd_buff_wr);
+  assign nv_we    = st_run | df_run | (loading & sd_ack & sd_buff_wr);
   assign nv_addr  = hw[11:1];
   assign nv_be    = hw[0] ? 4'b0011 : 4'b1100;
   assign nv_wdata = {half[7:0], half[15:8], half[7:0], half[15:8]};

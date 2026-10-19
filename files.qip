@@ -7,6 +7,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/pkg/mem_pkg.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/pkg/sbus_pkg.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/pkg/ss20_ddr_pkg.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/pkg/wish7990_pkg.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/pkg/obp_nvram_pkg.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/lib/ram_2r1w_be.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/lib/ram_sdp_be.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/lib/ram_sdp_bit.sv

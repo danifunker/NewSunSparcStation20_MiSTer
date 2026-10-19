@@ -66,6 +66,30 @@ changing the default:
 To make another ROM the default, copy it to
 `games/SunSparcStation/boot.rom`.
 
+### The NVRAM image (P5)
+
+The NVRAM holds the PROM's settings (`printenv`/`setenv`), the IDPROM
+(the Ethernet address and hostid) and the clock. Without an image in the
+NVRAM slot it lives only until the core is loaded again; with an 8 KB
+image file (any name, `.nvr`) the core loads it at start-up and writes
+every change back, so `setenv` sticks.
+
+- **No image, or a new blank file**: the core gives it an IDPROM (from
+  the MiSTer's ID, or 08:00:20:12:34:56) and the Sun OBP 2.25's defaults
+  (`auto-boot? true`, `boot-device disk`, `diag-switch? false`, the
+  console on the keyboard and screen), so the Sun PROM starts at once:
+  it tests 1 MB of memory (`selftest-#megs`) and boots the disk. A blank
+  file is filled in and saved at its first load. Make one with
+  `dd if=/dev/zero of=sun.nvr bs=8192 count=1`, or with the options
+  already set: `tools/obp_nvram.py --new sun.nvr output-device=ttya`.
+- **The two PROMs keep different formats.** OpenBIOS reads the Sun
+  format as unformatted ("nvram error detected"), uses its own defaults
+  and overwrites the image only at its first `setenv`. The Sun OBP reads
+  an OpenBIOS image (`tools/mknvram.py`) as a bad checksum: it then sets
+  its defaults with `diag-switch? true`, which runs the full POST and a
+  test of all of memory (minutes at 464 MB) and boots the network, at
+  every start until `setenv diag-switch? false`. Keep one image per PROM.
+
 ## What is here
 
 | Path | What | License |
