@@ -9,6 +9,12 @@ A Sun SPARCstation 20 (sun4m), written from scratch in SystemVerilog.
 
 **Requires the MiSTer SDRAM module.**
 
+> **Please test the video.** The frame buffer has just moved from the
+> DDR3 to the SDRAM module. Report anything wrong on screen: garbage,
+> wrong colours, a black screen, slow drawing. Say which PROM and OS
+> you used (console text, CDE/X, NeXTSTEP) and which SDRAM module you
+> have.
+
 ## Features
 
 - Two SuperSPARC (TMS390Z50) CPU modules at 55 MHz, SMP: integer unit,
@@ -56,6 +62,16 @@ A Sun SPARCstation 20 (sun4m), written from scratch in SystemVerilog.
 - CD audio.
 - The CPU and chipset test suite: 84 pass, 0 fail, 5 skip.
 - 30-minute stress runs under Solaris, both PROMs.
+
+## Limitations
+
+- At most 464 MB of memory.
+- CPUs at 55 MHz with no external cache (no SuperCache/MXCC).
+- One frame buffer: the TCX, 8-bit only (no 24-bit TCX, cgsix or SX).
+- No floppy drive, no parallel port device, no ISDN (DBRI) audio.
+- Sun's OBP is not included: supply your own SS20 PROM image.
+- The network and CD audio need a current Main_MiSTer (Sun support
+  merged 2026-10-06/07).
 
 ## Known issues
 
