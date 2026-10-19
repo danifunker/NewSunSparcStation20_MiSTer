@@ -193,11 +193,17 @@ module l1cache
   logic        fill_err, fill_snooped;
   logic [WW-1:0] fill_way;
   logic [31:24] fill_tag_hi;     // the victim's tag word at the start of the fill, above the tag (which is r_pa[35:12])
+  // I-cache: the other half-line of the way was invalidated (a snoop, an
+  // invalidation, the flash) after fill_tag_hi's snapshot, so the fill's
+  // tag writes must not set its valid bit again
+  logic        fill_other_gone;
   /* verilator lint_off UNUSEDSIGNAL */   // [23:0]: always 0
   logic [31:0] r_vbit, q_vbit;   // vbit_of(r_pa), vbit_of(q_pa) (Quartus 17: no part-select of a call)
   /* verilator lint_on UNUSEDSIGNAL */
   logic [31:0] fill_tag_keep;
-  assign fill_tag_keep   = {fill_tag_hi, r_pa[35:12]};
+  logic [35:5] fill_other_line;
+  assign fill_other_line = {r_pa[35:6], ~r_pa[5]};
+  assign fill_tag_keep   = {(ICACHE && fill_other_gone) ? (fill_tag_hi & ~TAG_VMASK[31:24]) : fill_tag_hi, r_pa[35:12]};
   logic        st_hit_written;
   logic        single_lock;
 
@@ -626,7 +632,7 @@ module l1cache
       st <= S_IDLE;
       r_we <= 1'b0; r_atomic <= 1'b0; r_cacheable <= 1'b0; r_pa <= '0; r_be <= '0; r_wdata <= '0;
       fill_beat <= '0; fill_err <= 1'b0; fill_snooped <= 1'b0; fill_way <= '0;
-      fill_tag_hi <= '0;
+      fill_tag_hi <= '0; fill_other_gone <= 1'b0;
       st_hit_written <= 1'b0; single_lock <= 1'b0;
       rdata_q <= '0; err_q <= 1'b0;
       sq_wr <= '0; sq_rd <= '0; sq_count <= '0;
@@ -738,6 +744,12 @@ module l1cache
            (inval_i && inval_line_i == r_pa[35:5]) ||
            (qs == Q_CMP && q_cur[30:0] == r_pa[35:5])))   // queued entries were filtered at the push
         fill_snooped <= 1'b1;
+      if (ICACHE && (st == S_LOOKUP || st == S_FILL_START || st == S_FILL) &&
+          ((snoop_i.valid && snoop_i.line == fill_other_line) ||
+           (inval_i && inval_line_i == fill_other_line) ||
+           (qs == Q_CMP && q_cur[30:0] == fill_other_line) ||
+           flash_wr))
+        fill_other_gone <= 1'b1;
 
       // Taking a request (in S_IDLE, or in the cycle a read hit answers)
       if (can_take) begin
@@ -747,7 +759,7 @@ module l1cache
       if (accept) begin
         err_q <= 1'b0;
         st_hit_written <= 1'b0;
-        fill_err <= 1'b0; fill_snooped <= 1'b0;
+        fill_err <= 1'b0; fill_snooped <= 1'b0; fill_other_gone <= 1'b0;
         if (atomic_i) st <= S_LOOKUP;
         else if (!(cacheable_i && enable_i)) begin single_lock <= 1'b0; st <= S_SINGLE; end
         else if (we_i) begin if (!fast_st) st <= S_WRITE_WAIT; end
